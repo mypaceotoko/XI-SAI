@@ -1,4 +1,4 @@
-import { ScoreData, ClearGroup } from '@/types';
+import { ScoreData } from '@/types';
 
 /**
  * HUD (ヘッドアップディスプレイ)
@@ -25,28 +25,34 @@ export class HUD {
           width: 100%;
           pointer-events: none;
           z-index: 10;
-          padding: 16px;
+          padding: 6px 8px;
         }
-        .hud-stats {
+        .hud-bar {
           display: flex;
-          gap: 24px;
-          flex-wrap: wrap;
+          gap: 6px;
+          flex-wrap: nowrap;
+          justify-content: flex-start;
+          align-items: center;
         }
         .hud-stat {
-          background: rgba(0, 0, 0, 0.6);
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          border-radius: 8px;
-          padding: 8px 16px;
+          background: rgba(0, 0, 0, 0.55);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 6px;
+          padding: 3px 8px;
           backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          line-height: 1;
         }
         .hud-label {
-          font-size: 11px;
-          color: #888;
+          font-size: 9px;
+          color: #777;
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: 0.5px;
         }
         .hud-value {
-          font-size: 24px;
+          font-size: 15px;
           font-weight: bold;
           color: #fff;
           font-variant-numeric: tabular-nums;
@@ -55,44 +61,65 @@ export class HUD {
         .hud-value.combo { color: #ff6644; }
         .hud-value.chain { color: #44ddff; }
         .hud-value.cleared { color: #44ff88; }
+
+        /* スマホ縦画面 */
+        @media (max-width: 600px) {
+          #hud { padding: 4px 6px; }
+          .hud-bar { gap: 4px; }
+          .hud-stat { padding: 2px 6px; border-radius: 4px; gap: 4px; }
+          .hud-label { font-size: 8px; }
+          .hud-value { font-size: 12px; }
+        }
+
+        /* スマホ横画面 */
+        @media (max-height: 500px) {
+          #hud { padding: 2px 6px; }
+          .hud-stat { padding: 2px 6px; }
+          .hud-label { font-size: 8px; }
+          .hud-value { font-size: 11px; }
+        }
+
         #notification {
           position: absolute;
-          top: 50%;
+          top: 40%;
           left: 50%;
           transform: translate(-50%, -50%);
-          font-size: 36px;
+          font-size: 28px;
           font-weight: bold;
           color: #fff;
-          text-shadow: 0 0 20px rgba(255, 255, 100, 0.8);
+          text-shadow: 0 0 16px rgba(255, 255, 100, 0.8), 0 2px 4px rgba(0,0,0,0.5);
           opacity: 0;
           transition: opacity 0.3s;
           pointer-events: none;
+          white-space: nowrap;
         }
-        #notification.visible {
-          opacity: 1;
-        }
+        #notification.visible { opacity: 1; }
         #notification.happy-one {
           color: #ff4444;
-          text-shadow: 0 0 30px rgba(255, 50, 50, 0.9);
-          font-size: 42px;
+          text-shadow: 0 0 24px rgba(255, 50, 50, 0.9), 0 2px 4px rgba(0,0,0,0.5);
+          font-size: 32px;
+        }
+        @media (max-width: 600px) {
+          #notification { font-size: 22px; top: 35%; }
+          #notification.happy-one { font-size: 26px; }
         }
       </style>
-      <div class="hud-stats">
+      <div class="hud-bar">
         <div class="hud-stat">
-          <div class="hud-label">Score</div>
-          <div class="hud-value score" id="hud-score">0</div>
+          <span class="hud-label">SCR</span>
+          <span class="hud-value score" id="hud-score">0</span>
         </div>
         <div class="hud-stat">
-          <div class="hud-label">Combo</div>
-          <div class="hud-value combo" id="hud-combo">0</div>
+          <span class="hud-label">CMB</span>
+          <span class="hud-value combo" id="hud-combo">0</span>
         </div>
         <div class="hud-stat">
-          <div class="hud-label">Chain</div>
-          <div class="hud-value chain" id="hud-chain">0</div>
+          <span class="hud-label">CHN</span>
+          <span class="hud-value chain" id="hud-chain">0</span>
         </div>
         <div class="hud-stat">
-          <div class="hud-label">Cleared</div>
-          <div class="hud-value cleared" id="hud-cleared">0</div>
+          <span class="hud-label">CLR</span>
+          <span class="hud-value cleared" id="hud-cleared">0</span>
         </div>
       </div>
       <div id="notification"></div>

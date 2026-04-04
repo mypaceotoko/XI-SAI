@@ -17,8 +17,9 @@ export class VirtualPad {
       <style>
         #virtual-pad {
           position: absolute;
-          bottom: 24px;
-          right: 24px;
+          bottom: 12px;
+          left: 50%;
+          transform: translateX(-50%);
           z-index: 50;
           display: none;
           pointer-events: auto;
@@ -26,20 +27,36 @@ export class VirtualPad {
         @media (max-width: 768px), (hover: none) {
           #virtual-pad { display: block; }
         }
+        /* 横画面: 右寄せ */
+        @media (max-height: 500px) {
+          #virtual-pad {
+            left: auto;
+            right: 10px;
+            bottom: 8px;
+            transform: none;
+          }
+        }
         .vpad-grid {
           display: grid;
-          grid-template-columns: 60px 60px 60px;
-          grid-template-rows: 60px 60px 60px;
-          gap: 4px;
+          grid-template-columns: 50px 50px 50px;
+          grid-template-rows: 50px 50px 50px;
+          gap: 3px;
+        }
+        @media (max-height: 500px) {
+          .vpad-grid {
+            grid-template-columns: 44px 44px 44px;
+            grid-template-rows: 44px 44px 44px;
+            gap: 2px;
+          }
         }
         .vpad-btn {
-          width: 60px;
-          height: 60px;
-          background: rgba(255, 255, 255, 0.15);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          border-radius: 12px;
+          width: 100%;
+          height: 100%;
+          background: rgba(255, 255, 255, 0.12);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          border-radius: 10px;
           color: #fff;
-          font-size: 24px;
+          font-size: 20px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -51,8 +68,8 @@ export class VirtualPad {
           background: rgba(0, 255, 170, 0.3);
         }
         .vpad-empty {
-          width: 60px;
-          height: 60px;
+          width: 100%;
+          height: 100%;
         }
       </style>
       <div class="vpad-grid">
