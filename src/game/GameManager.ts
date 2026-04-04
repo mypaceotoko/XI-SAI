@@ -53,6 +53,10 @@ export class GameManager {
   // DOM
   private appEl: HTMLElement;
   private animationId = 0;
+  private zoomBtnEl!: HTMLElement;
+
+  // ズームレベル: 0=遠景(全体), 1=近景(寄り)
+  private zoomLevel = 0;
 
   // 消去後のチェック遅延
   private pendingClearCheck = false;
@@ -159,13 +163,19 @@ export class GameManager {
     const cx = (BOARD_CONFIG.width - 1) / 2;
     const cz = (BOARD_CONFIG.depth - 1) / 2;
     const isPortrait = window.innerWidth < window.innerHeight && window.innerWidth <= 768;
-    if (isPortrait) {
-      // 縦画面: 引いた視点でボード全体を収める
-      this.camera.fov = 52;
-      this.camera.position.set(cx + 5, 14, cz + 12);
+
+    if (this.zoomLevel === 1) {
+      // 近景: ズームイン
+      this.camera.fov = isPortrait ? 38 : 30;
+      this.camera.position.set(cx + 4, 9, cz + 8);
     } else {
-      this.camera.fov = 40;
-      this.camera.position.set(cx + 6, 11, cz + 10);
+      // 遠景: ボード全体
+      this.camera.fov = isPortrait ? 52 : 40;
+      this.camera.position.set(
+        isPortrait ? cx + 5 : cx + 6,
+        isPortrait ? 14 : 11,
+        isPortrait ? cz + 12 : cz + 10,
+      );
     }
     this.camera.updateProjectionMatrix();
     this.camera.lookAt(cx, 0, cz);
@@ -182,6 +192,47 @@ export class GameManager {
       () => this.restartGame(),
       () => this.resumeGame(),
     );
+
+    this.initZoomButton();
+  }
+
+  /** ズームトグルボタン */
+  private initZoomButton(): void {
+    this.zoomBtnEl = document.createElement('button');
+    this.zoomBtnEl.id = 'zoom-btn';
+    this.zoomBtnEl.textContent = '🔍+';
+    this.zoomBtnEl.setAttribute('aria-label', 'ズーム切替');
+
+    const style = document.createElement('style');
+    style.textContent = `
+      #zoom-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        z-index: 20;
+        background: rgba(0,0,0,0.45);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 8px;
+        color: #fff;
+        font-size: 14px;
+        padding: 4px 10px;
+        cursor: pointer;
+        touch-action: none;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+      }
+      #zoom-btn:active { background: rgba(0,170,119,0.4); }
+    `;
+    this.appEl.appendChild(style);
+    this.appEl.appendChild(this.zoomBtnEl);
+
+    const toggle = () => {
+      this.zoomLevel = this.zoomLevel === 0 ? 1 : 0;
+      this.zoomBtnEl.textContent = this.zoomLevel === 1 ? '🔍−' : '🔍+';
+      this.updateCameraPosition();
+    };
+    this.zoomBtnEl.addEventListener('touchend', (e) => { e.preventDefault(); toggle(); }, { passive: false });
+    this.zoomBtnEl.addEventListener('click', toggle);
   }
 
   /** 入力初期化 */
