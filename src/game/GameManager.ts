@@ -87,6 +87,11 @@ export class GameManager {
     this.renderer.setClearColor(0x080810);
     this.appEl.appendChild(this.renderer.domElement);
 
+    // canvas へのタッチで合成マウスイベントが生成されるのを防ぐ
+    const canvas = this.renderer.domElement;
+    canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    canvas.addEventListener('touchend', (e) => e.preventDefault(), { passive: false });
+
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0x080810, 0.04);
 
@@ -226,6 +231,7 @@ export class GameManager {
 
   /** ゲーム開始 */
   private startGame(): void {
+    this.cleanup(); // 重複レンダラー防止（多重呼び出し対策）
     this.menu.hide();
     this.initGameObjects();
     this.gameState.transition('playing');

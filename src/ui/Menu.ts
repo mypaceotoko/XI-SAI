@@ -105,6 +105,20 @@ export class Menu {
     this.onResume = onResume;
   }
 
+  /**
+   * ボタンにタッチ/クリックハンドラを設定する。
+   * touchend で preventDefault を呼ぶことで合成 click イベントの二重発火を防ぐ。
+   */
+  private bindBtn(selector: string, handler: () => void): void {
+    const btn = this.container.querySelector(selector);
+    if (!btn) return;
+    btn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      handler();
+    }, { passive: false } as EventListenerOptions);
+    btn.addEventListener('click', handler);
+  }
+
   /** タイトル画面表示 */
   showTitle(): void {
     const content = this.container.querySelector('#menu-content')!;
@@ -117,7 +131,7 @@ export class Menu {
         <kbd>R</kbd> Restart &nbsp; <kbd>Esc</kbd> Pause
       </div>
     `;
-    content.querySelector('#btn-start')?.addEventListener('click', () => this.onStart?.());
+    this.bindBtn('#btn-start', () => this.onStart?.());
     this.show();
   }
 
@@ -130,7 +144,7 @@ export class Menu {
       <div class="menu-subtitle">Max Combo: ${maxCombo} | Cleared: ${totalCleared}</div>
       <button class="menu-btn" id="btn-retry">RETRY</button>
     `;
-    content.querySelector('#btn-retry')?.addEventListener('click', () => this.onRestart?.());
+    this.bindBtn('#btn-retry', () => this.onRestart?.());
     this.show();
   }
 
@@ -142,8 +156,8 @@ export class Menu {
       <button class="menu-btn" id="btn-resume">RESUME</button>
       <button class="menu-btn" id="btn-restart">RESTART</button>
     `;
-    content.querySelector('#btn-resume')?.addEventListener('click', () => this.onResume?.());
-    content.querySelector('#btn-restart')?.addEventListener('click', () => this.onRestart?.());
+    this.bindBtn('#btn-resume', () => this.onResume?.());
+    this.bindBtn('#btn-restart', () => this.onRestart?.());
     this.show();
   }
 
