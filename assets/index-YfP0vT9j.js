@@ -4055,28 +4055,34 @@ void main() {
           width: 100%;
           pointer-events: none;
           z-index: 10;
-          padding: 16px;
+          padding: 6px 8px;
         }
-        .hud-stats {
+        .hud-bar {
           display: flex;
-          gap: 24px;
-          flex-wrap: wrap;
+          gap: 6px;
+          flex-wrap: nowrap;
+          justify-content: flex-start;
+          align-items: center;
         }
         .hud-stat {
-          background: rgba(0, 0, 0, 0.6);
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          border-radius: 8px;
-          padding: 8px 16px;
+          background: rgba(0, 0, 0, 0.55);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 6px;
+          padding: 3px 8px;
           backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          line-height: 1;
         }
         .hud-label {
-          font-size: 11px;
-          color: #888;
+          font-size: 9px;
+          color: #777;
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: 0.5px;
         }
         .hud-value {
-          font-size: 24px;
+          font-size: 15px;
           font-weight: bold;
           color: #fff;
           font-variant-numeric: tabular-nums;
@@ -4085,44 +4091,65 @@ void main() {
         .hud-value.combo { color: #ff6644; }
         .hud-value.chain { color: #44ddff; }
         .hud-value.cleared { color: #44ff88; }
+
+        /* スマホ縦画面 */
+        @media (max-width: 600px) {
+          #hud { padding: 4px 6px; }
+          .hud-bar { gap: 4px; }
+          .hud-stat { padding: 2px 6px; border-radius: 4px; gap: 4px; }
+          .hud-label { font-size: 8px; }
+          .hud-value { font-size: 12px; }
+        }
+
+        /* スマホ横画面 */
+        @media (max-height: 500px) {
+          #hud { padding: 2px 6px; }
+          .hud-stat { padding: 2px 6px; }
+          .hud-label { font-size: 8px; }
+          .hud-value { font-size: 11px; }
+        }
+
         #notification {
           position: absolute;
-          top: 50%;
+          top: 40%;
           left: 50%;
           transform: translate(-50%, -50%);
-          font-size: 36px;
+          font-size: 28px;
           font-weight: bold;
           color: #fff;
-          text-shadow: 0 0 20px rgba(255, 255, 100, 0.8);
+          text-shadow: 0 0 16px rgba(255, 255, 100, 0.8), 0 2px 4px rgba(0,0,0,0.5);
           opacity: 0;
           transition: opacity 0.3s;
           pointer-events: none;
+          white-space: nowrap;
         }
-        #notification.visible {
-          opacity: 1;
-        }
+        #notification.visible { opacity: 1; }
         #notification.happy-one {
           color: #ff4444;
-          text-shadow: 0 0 30px rgba(255, 50, 50, 0.9);
-          font-size: 42px;
+          text-shadow: 0 0 24px rgba(255, 50, 50, 0.9), 0 2px 4px rgba(0,0,0,0.5);
+          font-size: 32px;
+        }
+        @media (max-width: 600px) {
+          #notification { font-size: 22px; top: 35%; }
+          #notification.happy-one { font-size: 26px; }
         }
       </style>
-      <div class="hud-stats">
+      <div class="hud-bar">
         <div class="hud-stat">
-          <div class="hud-label">Score</div>
-          <div class="hud-value score" id="hud-score">0</div>
+          <span class="hud-label">SCR</span>
+          <span class="hud-value score" id="hud-score">0</span>
         </div>
         <div class="hud-stat">
-          <div class="hud-label">Combo</div>
-          <div class="hud-value combo" id="hud-combo">0</div>
+          <span class="hud-label">CMB</span>
+          <span class="hud-value combo" id="hud-combo">0</span>
         </div>
         <div class="hud-stat">
-          <div class="hud-label">Chain</div>
-          <div class="hud-value chain" id="hud-chain">0</div>
+          <span class="hud-label">CHN</span>
+          <span class="hud-value chain" id="hud-chain">0</span>
         </div>
         <div class="hud-stat">
-          <div class="hud-label">Cleared</div>
-          <div class="hud-value cleared" id="hud-cleared">0</div>
+          <span class="hud-label">CLR</span>
+          <span class="hud-value cleared" id="hud-cleared">0</span>
         </div>
       </div>
       <div id="notification"></div>
@@ -4225,8 +4252,9 @@ void main() {
       <style>
         #virtual-pad {
           position: absolute;
-          bottom: 24px;
-          right: 24px;
+          bottom: 12px;
+          left: 50%;
+          transform: translateX(-50%);
           z-index: 50;
           display: none;
           pointer-events: auto;
@@ -4234,20 +4262,36 @@ void main() {
         @media (max-width: 768px), (hover: none) {
           #virtual-pad { display: block; }
         }
+        /* 横画面: 右寄せ */
+        @media (max-height: 500px) {
+          #virtual-pad {
+            left: auto;
+            right: 10px;
+            bottom: 8px;
+            transform: none;
+          }
+        }
         .vpad-grid {
           display: grid;
-          grid-template-columns: 60px 60px 60px;
-          grid-template-rows: 60px 60px 60px;
-          gap: 4px;
+          grid-template-columns: 50px 50px 50px;
+          grid-template-rows: 50px 50px 50px;
+          gap: 3px;
+        }
+        @media (max-height: 500px) {
+          .vpad-grid {
+            grid-template-columns: 44px 44px 44px;
+            grid-template-rows: 44px 44px 44px;
+            gap: 2px;
+          }
         }
         .vpad-btn {
-          width: 60px;
-          height: 60px;
-          background: rgba(255, 255, 255, 0.15);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          border-radius: 12px;
+          width: 100%;
+          height: 100%;
+          background: rgba(255, 255, 255, 0.12);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          border-radius: 10px;
           color: #fff;
-          font-size: 24px;
+          font-size: 20px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -4259,8 +4303,8 @@ void main() {
           background: rgba(0, 255, 170, 0.3);
         }
         .vpad-empty {
-          width: 60px;
-          height: 60px;
+          width: 100%;
+          height: 100%;
         }
       </style>
       <div class="vpad-grid">
