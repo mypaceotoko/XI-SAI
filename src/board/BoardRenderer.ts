@@ -17,6 +17,7 @@ export class BoardRenderer {
   private diceMeshes: Map<number, THREE.Mesh> = new Map();
   private groundMesh!: THREE.Mesh;
   private gridLines!: THREE.Group;
+  private edgeWalls!: THREE.Group;
 
   constructor(scene: THREE.Scene, board: Board) {
     this.scene = scene;
@@ -27,6 +28,7 @@ export class BoardRenderer {
   init(): void {
     this.createGround();
     this.createGridLines();
+    this.createEdgeIndicators();
     this.syncAllDice();
   }
 
@@ -34,11 +36,11 @@ export class BoardRenderer {
   private createGround(): void {
     const w = this.board.width;
     const d = this.board.depth;
-    const geometry = new THREE.PlaneGeometry(w + 0.4, d + 0.4);
+    const geometry = new THREE.PlaneGeometry(w + 1, d + 1);
     const material = new THREE.MeshStandardMaterial({
-      color: 0x1a1a2e,
-      roughness: 0.8,
-      metalness: 0.2,
+      color: 0x111122,
+      roughness: 0.9,
+      metalness: 0.1,
     });
     this.groundMesh = new THREE.Mesh(geometry, material);
     this.groundMesh.rotation.x = -Math.PI / 2;
@@ -47,34 +49,63 @@ export class BoardRenderer {
     this.scene.add(this.groundMesh);
   }
 
-  /** グリッド線を作成 */
+  /** グリッド線を作成（地面に薄く） */
   private createGridLines(): void {
     this.gridLines = new THREE.Group();
     const w = this.board.width;
     const d = this.board.depth;
-    const material = new THREE.LineBasicMaterial({ color: 0x333355, transparent: true, opacity: 0.5 });
+    const material = new THREE.LineBasicMaterial({
+      color: 0x222244,
+      transparent: true,
+      opacity: 0.4,
+    });
 
-    // 横線
     for (let z = 0; z <= d; z++) {
       const points = [
-        new THREE.Vector3(-0.5, 0, z - 0.5),
-        new THREE.Vector3(w - 0.5, 0, z - 0.5),
+        new THREE.Vector3(-0.5, 0.005, z - 0.5),
+        new THREE.Vector3(w - 0.5, 0.005, z - 0.5),
       ];
       const geometry = new THREE.BufferGeometry().setFromPoints(points);
       this.gridLines.add(new THREE.Line(geometry, material));
     }
 
-    // 縦線
     for (let x = 0; x <= w; x++) {
       const points = [
-        new THREE.Vector3(x - 0.5, 0, -0.5),
-        new THREE.Vector3(x - 0.5, 0, d - 0.5),
+        new THREE.Vector3(x - 0.5, 0.005, -0.5),
+        new THREE.Vector3(x - 0.5, 0.005, d - 0.5),
       ];
       const geometry = new THREE.BufferGeometry().setFromPoints(points);
       this.gridLines.add(new THREE.Line(geometry, material));
     }
 
     this.scene.add(this.gridLines);
+  }
+
+  /** 盤面の端を示す光るライン */
+  private createEdgeIndicators(): void {
+    this.edgeWalls = new THREE.Group();
+    const w = this.board.width;
+    const d = this.board.depth;
+    const material = new THREE.LineBasicMaterial({
+      color: 0x4466aa,
+      transparent: true,
+      opacity: 0.6,
+    });
+
+    // 4辺のエッジ
+    const edges: [THREE.Vector3, THREE.Vector3][] = [
+      [new THREE.Vector3(-0.5, 0, -0.5), new THREE.Vector3(w - 0.5, 0, -0.5)],
+      [new THREE.Vector3(w - 0.5, 0, -0.5), new THREE.Vector3(w - 0.5, 0, d - 0.5)],
+      [new THREE.Vector3(w - 0.5, 0, d - 0.5), new THREE.Vector3(-0.5, 0, d - 0.5)],
+      [new THREE.Vector3(-0.5, 0, d - 0.5), new THREE.Vector3(-0.5, 0, -0.5)],
+    ];
+
+    for (const [start, end] of edges) {
+      const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+      this.edgeWalls.add(new THREE.Line(geometry, material));
+    }
+
+    this.scene.add(this.edgeWalls);
   }
 
   /** 全サイコロのMeshを同期 */
@@ -147,5 +178,6 @@ export class BoardRenderer {
     this.diceMeshes.clear();
     if (this.groundMesh) this.scene.remove(this.groundMesh);
     if (this.gridLines) this.scene.remove(this.gridLines);
+    if (this.edgeWalls) this.scene.remove(this.edgeWalls);
   }
 }

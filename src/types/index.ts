@@ -34,13 +34,21 @@ export interface DiceData {
   moveProgress: number;
 }
 
+/** プレイヤーの高さ状態 */
+export type PlayerLevel = 'ground' | 'on_dice';
+
 /** プレイヤーデータ */
 export interface PlayerData {
   pos: GridPos;
+  level: PlayerLevel;
+  /** 乗っているサイコロのID (on_diceの時) */
+  ridingDiceId: number | null;
   moving: boolean;
   moveFrom: GridPos | null;
   moveProgress: number;
   direction: Direction;
+  /** 移動タイプ（アニメーション用） */
+  moveType: 'walk' | 'ride_roll' | 'climb' | 'descend';
 }
 
 /** ゲーム状態 */
@@ -72,8 +80,10 @@ export interface ClearGroup {
 export interface BoardConfig {
   width: number;
   depth: number;
-  initialDiceCount: number;
-  newDiceInterval: number; // フレーム数ごとに新しいサイコロ追加
+  /** 初期空きマスの数 */
+  initialEmptyCount: number;
+  /** 新しいサイコロが追加される間隔(フレーム) */
+  newDiceInterval: number;
 }
 
 /** 方向ベクトルのマッピング */

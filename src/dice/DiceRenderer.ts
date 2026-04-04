@@ -1,46 +1,68 @@
 import * as THREE from 'three';
 import { DiceData } from '@/types';
-import { getTopFace } from './Dice';
 import { lerp, easeOutCubic } from '@/utils';
 
 const DICE_SIZE = 0.9;
 const DICE_GEOMETRY = new THREE.BoxGeometry(DICE_SIZE, DICE_SIZE, DICE_SIZE);
 
-// 出目ごとの色
-const FACE_COLORS: Record<number, string> = {
-  1: '#ff4444',
-  2: '#44aaff',
-  3: '#44dd44',
-  4: '#dddd44',
-  5: '#dd44dd',
-  6: '#ff8844',
+// 出目ごとのサイコロ本体色（XIのようにカラフル）
+const DICE_BODY_COLORS: Record<number, number> = {
+  1: 0xdddddd, // 白/灰
+  2: 0x4488cc, // 青
+  3: 0x44aa44, // 緑
+  4: 0xcccc44, // 黄
+  5: 0xaa44aa, // 紫
+  6: 0xcc6633, // 橙
 };
 
-/** 出目のテクスチャをCanvasで生成 */
-function createDiceTexture(value: number): THREE.CanvasTexture {
+// ドットの色
+const DOT_COLOR = '#111111';
+
+/** 出目テクスチャをCanvasで生成（出目ごとに背景色が異なる） */
+function createDiceTexture(value: number, bodyColor: number): THREE.CanvasTexture {
   const size = 128;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
 
-  // 背景
-  ctx.fillStyle = '#ffffff';
+  // 背景色（サイコロ本体の色）
+  const color = '#' + bodyColor.toString(16).padStart(6, '0');
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, size, size);
+
+  // 少しグラデーション感を出す
+  const grad = ctx.createLinearGradient(0, 0, size, size);
+  grad.addColorStop(0, 'rgba(255,255,255,0.15)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.1)');
+  ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
 
   // 枠線
-  ctx.strokeStyle = '#cccccc';
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+  ctx.lineWidth = 3;
   ctx.strokeRect(2, 2, size - 4, size - 4);
 
-  // ドットの配置パターン
-  ctx.fillStyle = FACE_COLORS[value] || '#333333';
-  const dotR = 12;
+  // ドット配置
+  ctx.fillStyle = DOT_COLOR;
+  const dotR = 10;
   const positions = getDotPositions(value, size);
-  for (const [cx, cy] of positions) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
-    ctx.fill();
+
+  // 1の目は赤いドット
+  if (value === 1) {
+    ctx.fillStyle = '#cc2222';
+    dotR; // 1のドットは大きめ
+    for (const [cx, cy] of positions) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    for (const [cx, cy] of positions) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -63,18 +85,23 @@ function getDotPositions(value: number, size: number): [number, number][] {
   return positions[value] || [[c, c]];
 }
 
-// テクスチャキャッシュ
-const textureCache = new Map<number, THREE.CanvasTexture>();
+// テクスチャキャッシュ: key = `${value}_${bodyColor}`
+const textureCache = new Map<string, THREE.CanvasTexture>();
 
-function getTexture(value: number): THREE.CanvasTexture {
-  if (!textureCache.has(value)) {
-    textureCache.set(value, createDiceTexture(value));
+function getTexture(value: number, bodyColor: number): THREE.CanvasTexture {
+  const key = `${value}_${bodyColor}`;
+  if (!textureCache.has(key)) {
+    textureCache.set(key, createDiceTexture(value, bodyColor));
   }
-  return textureCache.get(value)!;
+  return textureCache.get(key)!;
 }
 
-/** サイコロの6面マテリアルを生成 */
+/** サイコロの6面マテリアルを生成（上面の出目で色を決定） */
 function createDiceMaterials(dice: DiceData): THREE.MeshStandardMaterial[] {
+  // 上面の値でサイコロ全体の色を決定
+  const topValue = dice.faces.top;
+  const bodyColor = DICE_BODY_COLORS[topValue] || 0x888888;
+
   // Three.js BoxGeometry の面順: +X, -X, +Y, -Y, +Z, -Z
   // = east, west, top, bottom, south, north
   const { east, west, top, bottom, south, north } = dice.faces;
@@ -82,9 +109,9 @@ function createDiceMaterials(dice: DiceData): THREE.MeshStandardMaterial[] {
 
   return order.map(value => {
     return new THREE.MeshStandardMaterial({
-      map: getTexture(value),
-      roughness: 0.3,
-      metalness: 0.1,
+      map: getTexture(value, bodyColor),
+      roughness: 0.4,
+      metalness: 0.05,
     });
   });
 }
@@ -119,33 +146,42 @@ export function updateDiceClearAnimation(mesh: THREE.Mesh, dice: DiceData): void
   if (!dice.clearing) return;
 
   const t = dice.clearProgress;
-  // 発光 → 縮小 → 沈み込み
-  const scale = t < 0.3 ? 1 + Math.sin(t / 0.3 * Math.PI) * 0.2 : Math.max(0, 1 - (t - 0.3) / 0.7);
-  const y = t > 0.3 ? (DICE_SIZE / 2) * (1 - (t - 0.3) / 0.7) : DICE_SIZE / 2;
+
+  // フェーズ1 (0~0.3): 点滅・発光
+  // フェーズ2 (0.3~1.0): 沈み込み・縮小
+  const scale = t < 0.3
+    ? 1 + Math.sin(t / 0.3 * Math.PI * 3) * 0.1
+    : Math.max(0, 1 - (t - 0.3) / 0.7);
+  const y = t > 0.3
+    ? (DICE_SIZE / 2) * Math.max(0, 1 - (t - 0.3) / 0.7 * 1.5)
+    : DICE_SIZE / 2;
 
   mesh.scale.setScalar(scale);
-  mesh.position.y = Math.max(0, y);
+  mesh.position.y = Math.max(-0.2, y);
 
   // 発光エフェクト
   const materials = mesh.material as THREE.MeshStandardMaterial[];
   if (Array.isArray(materials)) {
-    const emissiveIntensity = t < 0.3 ? Math.sin(t / 0.3 * Math.PI) * 2 : Math.max(0, 1 - (t - 0.3) / 0.7);
+    const emissiveIntensity = t < 0.3
+      ? Math.abs(Math.sin(t / 0.3 * Math.PI * 3)) * 2
+      : Math.max(0, 1 - (t - 0.3) / 0.7);
     materials.forEach(m => {
-      m.emissive = new THREE.Color(0xffffff);
+      m.emissive = new THREE.Color(0xffffaa);
       m.emissiveIntensity = emissiveIntensity;
+      if (t > 0.5) {
+        m.transparent = true;
+        m.opacity = Math.max(0, 1 - (t - 0.5) / 0.5);
+      }
     });
   }
 }
 
-/** サイコロMeshのマテリアルを更新(面が変わった時) */
+/** サイコロMeshのマテリアルを更新（転がった後） */
 export function updateDiceMaterials(mesh: THREE.Mesh, dice: DiceData): void {
   const newMaterials = createDiceMaterials(dice);
   const oldMaterials = mesh.material as THREE.MeshStandardMaterial[];
   if (Array.isArray(oldMaterials)) {
-    oldMaterials.forEach(m => {
-      if (m.map) m.map.dispose();
-      m.dispose();
-    });
+    oldMaterials.forEach(m => m.dispose());
   }
   mesh.material = newMaterials;
 }

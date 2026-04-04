@@ -15,10 +15,10 @@ import { AudioManager } from '@/audio/AudioManager';
 import { resetDiceIdCounter } from '@/dice/Dice';
 
 const BOARD_CONFIG: BoardConfig = {
-  width: 7,
-  depth: 7,
-  initialDiceCount: 12,
-  newDiceInterval: 300, // 約5秒ごと(60fpsで)
+  width: 8,
+  depth: 8,
+  initialEmptyCount: 6,     // 最初の空きマス数
+  newDiceInterval: 360,      // 約6秒ごと(60fpsで)
 };
 
 /**
@@ -54,6 +54,10 @@ export class GameManager {
   private appEl: HTMLElement;
   private animationId = 0;
 
+  // 消去後のチェック遅延
+  private pendingClearCheck = false;
+  private clearCheckDelay = 0;
+
   constructor(appEl: HTMLElement) {
     this.appEl = appEl;
     this.gameState = new GameState();
@@ -67,26 +71,27 @@ export class GameManager {
 
     // タイトル画面表示
     this.menu.showTitle();
+
+    // 背景だけ描画するループ
+    this.startRenderLoop();
   }
 
   /** Three.js 初期化 */
   private initThree(): void {
-    // レンダラー
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.setClearColor(0x0a0a1a);
+    this.renderer.setClearColor(0x080810);
     this.appEl.appendChild(this.renderer.domElement);
 
-    // シーン
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x0a0a1a, 15, 25);
+    this.scene.fog = new THREE.FogExp2(0x080810, 0.04);
 
-    // カメラ（見下ろし寄りの3D感ある角度）
+    // カメラ（XIのような斜め見下ろしアングル）
     this.camera = new THREE.PerspectiveCamera(
-      45,
+      40,
       window.innerWidth / window.innerHeight,
       0.1,
       100,
@@ -94,22 +99,23 @@ export class GameManager {
     this.updateCameraPosition();
 
     // ライティング
-    const ambientLight = new THREE.AmbientLight(0x334455, 0.8);
+    const ambientLight = new THREE.AmbientLight(0x445566, 1.0);
     this.scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirLight.position.set(5, 10, 5);
+    const dirLight = new THREE.DirectionalLight(0xffeedd, 1.5);
+    dirLight.position.set(8, 12, 6);
     dirLight.castShadow = true;
-    dirLight.shadow.mapSize.set(1024, 1024);
-    dirLight.shadow.camera.left = -10;
-    dirLight.shadow.camera.right = 10;
-    dirLight.shadow.camera.top = 10;
-    dirLight.shadow.camera.bottom = -10;
+    dirLight.shadow.mapSize.set(2048, 2048);
+    dirLight.shadow.camera.left = -12;
+    dirLight.shadow.camera.right = 12;
+    dirLight.shadow.camera.top = 12;
+    dirLight.shadow.camera.bottom = -12;
     this.scene.add(dirLight);
 
-    const pointLight = new THREE.PointLight(0x4488ff, 0.5, 20);
-    pointLight.position.set(-3, 5, -3);
-    this.scene.add(pointLight);
+    // バックライト
+    const backLight = new THREE.DirectionalLight(0x4466aa, 0.4);
+    backLight.position.set(-5, 8, -5);
+    this.scene.add(backLight);
 
     // リサイズ対応
     window.addEventListener('resize', () => this.onResize());
@@ -118,7 +124,8 @@ export class GameManager {
   private updateCameraPosition(): void {
     const cx = (BOARD_CONFIG.width - 1) / 2;
     const cz = (BOARD_CONFIG.depth - 1) / 2;
-    this.camera.position.set(cx, 10, cz + 8);
+    // XIのような斜め上からの視点
+    this.camera.position.set(cx + 6, 11, cz + 10);
     this.camera.lookAt(cx, 0, cz);
   }
 
@@ -151,11 +158,13 @@ export class GameManager {
     switch (action.type) {
       case 'move':
         if (!this.gameState.canPlayerAct()) return;
-        if (!this.player.isIdle()) return;
+        if (!this.player || !this.player.isIdle()) return;
         this.handleMove(action.direction);
         break;
       case 'restart':
-        this.restartGame();
+        if (this.gameState.isPlaying() || this.gameState.phase === 'gameover') {
+          this.restartGame();
+        }
         break;
       case 'pause':
         if (this.gameState.phase === 'playing' || this.gameState.phase === 'clearing') {
@@ -169,25 +178,32 @@ export class GameManager {
 
   /** 移動処理 */
   private handleMove(direction: Direction): void {
-    const targetDice = this.getTargetDice(direction);
-    const moved = this.player.move(direction);
+    const moveType = this.player.move(direction);
 
-    if (moved) {
-      if (targetDice) {
-        this.audioManager.playPush();
-        // 押したサイコロのテクスチャ更新
-        this.boardRenderer.refreshDiceMaterial(targetDice);
-      } else {
-        this.audioManager.playMove();
+    if (moveType) {
+      switch (moveType) {
+        case 'ride_roll':
+          this.audioManager.playPush();
+          // 転がしたサイコロのテクスチャ更新
+          if (this.player.data.ridingDiceId !== null) {
+            const dice = this.board.getDiceById(this.player.data.ridingDiceId);
+            if (dice) {
+              this.boardRenderer.refreshDiceMaterial(dice);
+            }
+          }
+          // 転がした後に消去チェックを予約
+          this.pendingClearCheck = true;
+          this.clearCheckDelay = 10;
+          break;
+        case 'climb':
+        case 'descend':
+          this.audioManager.playMove();
+          break;
+        case 'walk':
+          this.audioManager.playMove();
+          break;
       }
     }
-  }
-
-  /** 移動先のサイコロを取得 */
-  private getTargetDice(direction: Direction) {
-    const dv = { north: { x: 0, z: -1 }, south: { x: 0, z: 1 }, east: { x: 1, z: 0 }, west: { x: -1, z: 0 } }[direction];
-    const targetPos = { x: this.player.data.pos.x + dv.x, z: this.player.data.pos.z + dv.z };
-    return this.board.getDiceAt(targetPos);
   }
 
   /** ゲーム開始 */
@@ -195,7 +211,6 @@ export class GameManager {
     this.menu.hide();
     this.initGameObjects();
     this.gameState.transition('playing');
-    this.startGameLoop();
   }
 
   /** ゲームリスタート */
@@ -204,7 +219,6 @@ export class GameManager {
     this.cleanup();
     this.initGameObjects();
     this.gameState.transition('playing');
-    this.startGameLoop();
   }
 
   /** ポーズ */
@@ -223,13 +237,27 @@ export class GameManager {
   private initGameObjects(): void {
     resetDiceIdCounter();
     this.happyOneTracker.clear();
+    this.pendingClearCheck = false;
 
-    // ボード作成
+    // ボード作成（サイコロで埋まった盤面）
     this.board = new Board(BOARD_CONFIG);
-    this.board.init();
+    const emptyPositions = this.board.init();
 
-    // プレイヤー作成（盤面中央付近の空きマスに配置）
-    const startPos = this.findEmptyPos();
+    // プレイヤーを空きマスの中央寄りに配置
+    const cx = Math.floor(BOARD_CONFIG.width / 2);
+    const cz = Math.floor(BOARD_CONFIG.depth / 2);
+    let startPos = emptyPositions[0] || { x: cx, z: cz };
+
+    // 中央に最も近い空きマスを選ぶ
+    let bestDist = Infinity;
+    for (const pos of emptyPositions) {
+      const dist = Math.abs(pos.x - cx) + Math.abs(pos.z - cz);
+      if (dist < bestDist) {
+        bestDist = dist;
+        startPos = pos;
+      }
+    }
+
     this.player = new Player(this.board, startPos);
 
     // チェーンマネージャー
@@ -246,25 +274,6 @@ export class GameManager {
 
     // HUD初期化
     this.hud.updateScore(this.chainManager.score);
-  }
-
-  /** 空いているポジションを探す */
-  private findEmptyPos() {
-    const cx = Math.floor(BOARD_CONFIG.width / 2);
-    const cz = Math.floor(BOARD_CONFIG.depth / 2);
-
-    // 中央から近い順に空きマスを探す
-    for (let r = 0; r < Math.max(BOARD_CONFIG.width, BOARD_CONFIG.depth); r++) {
-      for (let dx = -r; dx <= r; dx++) {
-        for (let dz = -r; dz <= r; dz++) {
-          const pos = { x: cx + dx, z: cz + dz };
-          if (this.board.isInBounds(pos) && this.board.isEmpty(pos)) {
-            return pos;
-          }
-        }
-      }
-    }
-    return { x: cx, z: cz };
   }
 
   /** 消去開始コールバック */
@@ -296,12 +305,12 @@ export class GameManager {
     this.audioManager.playCombo(chainCount);
   }
 
-  /** ゲームループ開始 */
-  private startGameLoop(): void {
+  /** 描画ループ（常時動作） */
+  private startRenderLoop(): void {
     const loop = () => {
       this.animationId = requestAnimationFrame(loop);
       this.update();
-      this.render();
+      this.renderer.render(this.scene, this.camera);
     };
     loop();
   }
@@ -309,32 +318,39 @@ export class GameManager {
   /** フレーム更新 */
   private update(): void {
     if (this.gameState.phase === 'paused') return;
-
     if (!this.gameState.isPlaying()) return;
+    if (!this.board || !this.player) return;
 
     // プレイヤー更新
     this.player.update();
 
     // ボード更新（新サイコロ追加など）
-    const newDice = this.board.update();
+    const newDice = this.board.update(this.player.data.pos);
     if (newDice) {
       this.boardRenderer.addDiceMesh(newDice);
     }
 
-    // 消去チェック
+    // 消去チェック遅延処理
+    if (this.pendingClearCheck && this.player.isIdle()) {
+      this.clearCheckDelay--;
+      if (this.clearCheckDelay <= 0) {
+        this.pendingClearCheck = false;
+        const started = this.chainManager.checkAndStartClearing();
+        if (started) {
+          this.gameState.transition('clearing');
+        }
+      }
+    }
+
+    // 消去アニメーション処理
     if (this.chainManager.getIsClearing()) {
-      // 消去アニメーション中
       const stillClearing = this.chainManager.update();
       if (!stillClearing) {
         // 消去完了 → Meshを同期
         this.boardRenderer.syncAllDice();
+        // プレイヤーの乗り状態を再チェック（乗っていたサイコロが消えた場合）
+        this.player.syncRidingState();
         this.gameState.transition('playing');
-      }
-    } else if (this.player.isIdle()) {
-      // プレイヤーが止まった時に消去チェック
-      const started = this.chainManager.checkAndStartClearing();
-      if (started) {
-        this.gameState.transition('clearing');
       }
     }
 
@@ -342,8 +358,11 @@ export class GameManager {
     this.hud.updateScore(this.chainManager.score);
 
     // ゲームオーバーチェック
-    if (this.board.isBoardFull() && !this.chainManager.getIsClearing()) {
-      this.gameOver();
+    if (!this.chainManager.getIsClearing() && this.board.isGameOver(this.player.data.pos)) {
+      // プレイヤーが動けるか最終チェック
+      if (this.isPlayerStuck()) {
+        this.gameOver();
+      }
     }
 
     // 描画更新
@@ -351,9 +370,37 @@ export class GameManager {
     this.playerRenderer.update(this.player.data);
   }
 
-  /** 描画 */
-  private render(): void {
-    this.renderer.render(this.scene, this.camera);
+  /** プレイヤーが完全に動けないかチェック */
+  private isPlayerStuck(): boolean {
+    const pos = this.player.data.pos;
+    const directions: Direction[] = ['north', 'south', 'east', 'west'];
+
+    for (const dir of directions) {
+      const dv = { north: { x: 0, z: -1 }, south: { x: 0, z: 1 }, east: { x: 1, z: 0 }, west: { x: -1, z: 0 } }[dir];
+      const targetPos = { x: pos.x + dv.x, z: pos.z + dv.z };
+
+      if (!this.board.isInBounds(targetPos)) continue;
+
+      const diceAtTarget = this.board.getDiceAt(targetPos);
+
+      if (!diceAtTarget) {
+        // 空きマスがある→移動可能
+        return false;
+      }
+
+      if (this.player.data.level === 'on_dice' || this.player.data.level === 'ground') {
+        // サイコロの上にいる場合: 隣のサイコロに乗り移れる
+        // または隣のサイコロを転がせるか（さらにその先が空き）
+        if (this.player.data.level === 'on_dice' && this.player.data.ridingDiceId !== null) {
+          // 乗っているサイコロの先が空いていれば転がせる
+          // ただし乗り移りは常にOK
+          return false; // 隣にサイコロがあれば乗り移れる
+        }
+        return false; // 地面からサイコロに登れる
+      }
+    }
+
+    return true; // どの方向にも移動できない
   }
 
   /** ゲームオーバー */
@@ -373,9 +420,6 @@ export class GameManager {
 
   /** クリーンアップ */
   private cleanup(): void {
-    if (this.animationId) {
-      cancelAnimationFrame(this.animationId);
-    }
     if (this.boardRenderer) this.boardRenderer.dispose();
     if (this.playerRenderer) this.playerRenderer.dispose();
   }

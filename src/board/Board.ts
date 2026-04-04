@@ -1,11 +1,12 @@
 import { BoardConfig, DiceData, GridPos, Direction, DIR_VECTORS } from '@/types';
 import { createDice, getTopFace } from '@/dice/Dice';
 import { rollDice } from '@/dice/DiceRotation';
-import { samePos, posKey, inBounds, randInt } from '@/utils';
+import { posKey, inBounds, randInt } from '@/utils';
 
 /**
  * 盤面ロジック
- * グリッドベースでサイコロの配置を管理する
+ * XIスタイル: サイコロで埋め尽くされたグリッドがフィールド
+ * プレイヤーはサイコロの上に乗って移動する
  */
 export class Board {
   readonly width: number;
@@ -21,35 +22,44 @@ export class Board {
     this.depth = config.depth;
   }
 
-  /** 盤面を初期化 */
-  init(): void {
+  /** 盤面を初期化: ほぼ全面をサイコロで埋める */
+  init(): GridPos[] {
     this.diceMap.clear();
     this.diceById.clear();
     this.frameCount = 0;
 
-    // ランダムにサイコロを配置
-    const positions: GridPos[] = [];
+    // 全マスの座標リスト
+    const allPositions: GridPos[] = [];
     for (let x = 0; x < this.width; x++) {
       for (let z = 0; z < this.depth; z++) {
-        positions.push({ x, z });
+        allPositions.push({ x, z });
       }
     }
 
-    // シャッフル
-    for (let i = positions.length - 1; i > 0; i--) {
+    // シャッフルして、一部を空きマスにする
+    const shuffled = [...allPositions];
+    for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [positions[i], positions[j]] = [positions[j], positions[i]];
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
 
-    // 初期配置（端は空けてプレイヤーの動けるスペースを確保）
-    const count = Math.min(this.config.initialDiceCount, positions.length);
-    for (let i = 0; i < count; i++) {
-      const pos = positions[i];
-      // 1~6のランダムな上面
+    // 空きマスを選定
+    const emptyCount = Math.min(this.config.initialEmptyCount, allPositions.length - 1);
+    const emptySet = new Set<string>();
+    for (let i = 0; i < emptyCount; i++) {
+      emptySet.add(posKey(shuffled[i]));
+    }
+
+    // サイコロを配置
+    for (const pos of allPositions) {
+      if (emptySet.has(posKey(pos))) continue;
       const topValue = randInt(1, 6);
       const dice = createDice(pos, topValue);
       this.addDice(dice);
     }
+
+    // 空きマスリストを返す（プレイヤー初期位置決定用）
+    return shuffled.slice(0, emptyCount);
   }
 
   /** サイコロを盤面に追加 */
@@ -97,20 +107,24 @@ export class Board {
     return this.isInBounds(pos) && !this.getDiceAt(pos);
   }
 
-  /** サイコロを押す処理 */
-  pushDice(diceId: number, direction: Direction): boolean {
+  /**
+   * サイコロを転がす（プレイヤーが乗って移動する時）
+   * サイコロが指定方向に1マス転がる
+   * @returns 成功したらtrue
+   */
+  rollDiceToDirection(diceId: number, direction: Direction): boolean {
     const dice = this.diceById.get(diceId);
     if (!dice || dice.clearing || dice.moving) return false;
 
     const dv = DIR_VECTORS[direction];
     const newPos: GridPos = { x: dice.pos.x + dv.x, z: dice.pos.z + dv.z };
 
-    // 移動先が盤面外またはサイコロがある場合は押せない
+    // 移動先が盤面外またはサイコロがある場合は転がせない
     if (!this.isInBounds(newPos) || this.getDiceAt(newPos)) {
       return false;
     }
 
-    // 盤面のマップを更新
+    // 盤面マップを更新
     this.diceMap.delete(posKey(dice.pos));
     const oldPos = { ...dice.pos };
     dice.pos = { ...newPos };
@@ -119,26 +133,29 @@ export class Board {
     dice.moveProgress = 0;
     this.diceMap.set(posKey(dice.pos), dice);
 
-    // サイコロを転がす（面の回転）
+    // 面の回転を計算
     dice.faces = rollDice(dice.faces, direction);
 
     return true;
   }
 
-  /** 新しいサイコロを端から追加（ゲーム進行用） */
-  addNewDiceFromEdge(): DiceData | null {
-    // 端のマス（z=depth-1の行）で空いている場所を探す
-    const edgePositions: GridPos[] = [];
+  /** 新しいサイコロを空きマスに追加 */
+  addNewDiceAtEmpty(): DiceData | null {
+    // 空きマスを探す
+    const emptyPositions: GridPos[] = [];
     for (let x = 0; x < this.width; x++) {
-      const pos = { x, z: this.depth - 1 };
-      if (this.isEmpty(pos)) {
-        edgePositions.push(pos);
+      for (let z = 0; z < this.depth; z++) {
+        const pos = { x, z };
+        if (this.isEmpty(pos)) {
+          emptyPositions.push(pos);
+        }
       }
     }
 
-    if (edgePositions.length === 0) return null;
+    if (emptyPositions.length === 0) return null;
 
-    const pos = edgePositions[Math.floor(Math.random() * edgePositions.length)];
+    // ランダムな空きマスに配置
+    const pos = emptyPositions[Math.floor(Math.random() * emptyPositions.length)];
     const topValue = randInt(1, 6);
     const dice = createDice(pos, topValue);
     this.addDice(dice);
@@ -146,19 +163,19 @@ export class Board {
   }
 
   /** フレーム更新 */
-  update(): DiceData | null {
+  update(playerPos: GridPos): DiceData | null {
     this.frameCount++;
     let newDice: DiceData | null = null;
 
-    // 一定間隔で新しいサイコロを追加
+    // 一定間隔で新しいサイコロを追加（プレイヤー位置は避ける）
     if (this.config.newDiceInterval > 0 && this.frameCount % this.config.newDiceInterval === 0) {
-      newDice = this.addNewDiceFromEdge();
+      newDice = this.addNewDiceAtEmptyAvoidingPos(playerPos);
     }
 
     // 移動アニメーション更新
     for (const dice of this.getAllDice()) {
       if (dice.moving) {
-        dice.moveProgress += 0.1;
+        dice.moveProgress += 0.12;
         if (dice.moveProgress >= 1) {
           dice.moveProgress = 1;
           dice.moving = false;
@@ -170,15 +187,44 @@ export class Board {
     return newDice;
   }
 
-  /** ゲームオーバー判定：盤面が満杯か */
-  isBoardFull(): boolean {
+  /** プレイヤー位置を避けて新サイコロを追加 */
+  private addNewDiceAtEmptyAvoidingPos(avoidPos: GridPos): DiceData | null {
+    const emptyPositions: GridPos[] = [];
+    for (let x = 0; x < this.width; x++) {
+      for (let z = 0; z < this.depth; z++) {
+        const pos = { x, z };
+        if (this.isEmpty(pos) && !(pos.x === avoidPos.x && pos.z === avoidPos.z)) {
+          emptyPositions.push(pos);
+        }
+      }
+    }
+
+    if (emptyPositions.length === 0) return null;
+
+    const pos = emptyPositions[Math.floor(Math.random() * emptyPositions.length)];
+    const topValue = randInt(1, 6);
+    const dice = createDice(pos, topValue);
+    this.addDice(dice);
+    return dice;
+  }
+
+  /** 空きマスの数を取得 */
+  getEmptyCount(excludePos?: GridPos): number {
     let count = 0;
     for (let x = 0; x < this.width; x++) {
       for (let z = 0; z < this.depth; z++) {
-        if (this.getDiceAt({ x, z })) count++;
+        if (this.isEmpty({ x, z })) {
+          if (excludePos && x === excludePos.x && z === excludePos.z) continue;
+          count++;
+        }
       }
     }
-    return count >= this.width * this.depth - 1; // プレイヤー分1マス残す
+    return count;
+  }
+
+  /** ゲームオーバー判定：空きマスがプレイヤー位置の1つだけで、消去可能なものもない */
+  isGameOver(playerPos: GridPos): boolean {
+    return this.getEmptyCount(playerPos) === 0;
   }
 
   /** 消去中のサイコロがあるか */
