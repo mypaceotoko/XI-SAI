@@ -1,0 +1,26 @@
+{
+  "name": "dice-souls",
+  "version": "1.0.0",
+  "description": "A 3D dice puzzle game inspired by classic dice-matching mechanics",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:45625/git/mypaceotoko/XI-SAI"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/three": "^0.183.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3"
+  },
+  "dependencies": {
+    "three": "^0.183.2"
+  }
+}
