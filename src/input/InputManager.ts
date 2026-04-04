@@ -4,7 +4,7 @@ type InputCallback = (action: InputAction) => void;
 
 export type InputAction =
   | { type: 'move'; direction: Direction }
-  | { type: 'action' }
+  | { type: 'descend' }
   | { type: 'restart' }
   | { type: 'pause' };
 
@@ -49,8 +49,9 @@ export class InputManager {
 
       switch (e.code) {
         case 'Space':
+        case 'KeyZ':
           e.preventDefault();
-          this.callback?.({ type: 'action' });
+          this.callback?.({ type: 'descend' });
           break;
         case 'KeyR':
           this.callback?.({ type: 'restart' });

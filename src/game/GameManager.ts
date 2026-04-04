@@ -171,8 +171,12 @@ export class GameManager {
       this.handleInput(action);
     });
 
-    this.virtualPad.setCallback((direction: Direction) => {
-      this.handleInput({ type: 'move', direction });
+    this.virtualPad.setCallback((input: Direction | 'descend') => {
+      if (input === 'descend') {
+        this.handleInput({ type: 'descend' });
+      } else {
+        this.handleInput({ type: 'move', direction: input });
+      }
     });
   }
 
@@ -183,6 +187,13 @@ export class GameManager {
         if (!this.gameState.canPlayerAct()) return;
         if (!this.player || !this.player.isIdle()) return;
         this.handleMove(action.direction);
+        break;
+      case 'descend':
+        if (!this.gameState.canPlayerAct()) return;
+        if (!this.player || !this.player.isIdle()) return;
+        if (this.player.descend()) {
+          this.audioManager.playMove();
+        }
         break;
       case 'restart':
         if (this.gameState.isPlaying() || this.gameState.phase === 'gameover') {

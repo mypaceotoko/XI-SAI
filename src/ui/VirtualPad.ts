@@ -1,6 +1,6 @@
 import { Direction } from '@/types';
 
-type PadCallback = (direction: Direction) => void;
+type PadCallback = (input: Direction | 'descend') => void;
 
 /**
  * スマホ用仮想パッド
@@ -67,6 +67,14 @@ export class VirtualPad {
         .vpad-btn:active {
           background: rgba(0, 255, 170, 0.3);
         }
+        .vpad-btn--descend {
+          background: rgba(255, 200, 50, 0.15);
+          border-color: rgba(255, 200, 50, 0.35);
+          font-size: 14px;
+        }
+        .vpad-btn--descend:active {
+          background: rgba(255, 200, 50, 0.4);
+        }
         .vpad-empty {
           width: 100%;
           height: 100%;
@@ -78,7 +86,7 @@ export class VirtualPad {
         <div class="vpad-btn" data-dir="north">▲</div>
         <div class="vpad-empty"></div>
         <div class="vpad-btn" data-dir="west">◀</div>
-        <div class="vpad-empty"></div>
+        <div class="vpad-btn vpad-btn--descend" data-dir="descend">↓<br>降</div>
         <div class="vpad-btn" data-dir="east">▶</div>
         <div class="vpad-empty"></div>
         <div class="vpad-btn" data-dir="south">▼</div>
@@ -89,14 +97,14 @@ export class VirtualPad {
 
     // タッチ/クリックイベント
     this.container.querySelectorAll('.vpad-btn').forEach(btn => {
-      const dir = btn.getAttribute('data-dir') as Direction;
+      const input = btn.getAttribute('data-dir') as Direction | 'descend';
       btn.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        if (this.enabled && dir) this.callback?.(dir);
+        if (this.enabled && input) this.callback?.(input);
       });
       btn.addEventListener('mousedown', (e) => {
         e.preventDefault();
-        if (this.enabled && dir) this.callback?.(dir);
+        if (this.enabled && input) this.callback?.(input);
       });
     });
   }
@@ -105,6 +113,7 @@ export class VirtualPad {
   setCallback(cb: PadCallback): void {
     this.callback = cb;
   }
+
 
   /** 有効/無効切り替え */
   setEnabled(enabled: boolean): void {

@@ -67,11 +67,8 @@ export class Player {
             return 'ride_roll';
           }
         }
-        // サイコロが転がせない場合、地面に降りる
-        this.startMove(targetPos, 'descend');
-        this.data.level = 'ground';
-        this.data.ridingDiceId = null;
-        return 'descend';
+        // サイコロが転がせない場合は何もしない（自動で降りない）
+        return null;
       }
     } else {
       // === 地面にいる ===
@@ -124,6 +121,29 @@ export class Player {
       this.data.level = 'ground';
       this.data.ridingDiceId = null;
     }
+  }
+
+  /**
+   * サイコロから明示的に降りる（降りるボタン用）
+   * 現在の向き方向に空きマスがある場合のみ成功
+   */
+  descend(): 'descend' | null {
+    if (this.data.moving) return null;
+    if (this.data.level !== 'on_dice') return null;
+
+    const dv = DIR_VECTORS[this.data.direction];
+    const targetPos: GridPos = {
+      x: this.data.pos.x + dv.x,
+      z: this.data.pos.z + dv.z,
+    };
+
+    if (!this.board.isInBounds(targetPos)) return null;
+    if (this.board.getDiceAt(targetPos)) return null; // 隣にサイコロがあれば降りられない
+
+    this.startMove(targetPos, 'descend');
+    this.data.level = 'ground';
+    this.data.ridingDiceId = null;
+    return 'descend';
   }
 
   /** 位置をリセット */
