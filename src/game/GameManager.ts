@@ -89,8 +89,8 @@ export class GameManager {
 
     // canvas へのタッチで合成マウスイベントが生成されるのを防ぐ
     const canvas = this.renderer.domElement;
-    canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
-    canvas.addEventListener('touchend', (e) => e.preventDefault(), { passive: false });
+    canvas.addEventListener('touchstart', (e: TouchEvent) => e.preventDefault(), { passive: false });
+    canvas.addEventListener('touchend', (e: TouchEvent) => e.preventDefault(), { passive: false });
 
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0x080810, 0.04);
