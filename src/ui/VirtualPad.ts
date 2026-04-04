@@ -61,7 +61,7 @@ export class VirtualPad {
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          touch-action: manipulation;
+          touch-action: none;
           -webkit-tap-highlight-color: transparent;
         }
         .vpad-btn:active {

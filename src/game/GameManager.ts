@@ -78,6 +78,7 @@ export class GameManager {
 
   /** Three.js 初期化 */
   private initThree(): void {
+    let lastTouchEnd = 0;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -119,6 +120,23 @@ export class GameManager {
 
     // リサイズ対応
     window.addEventListener('resize', () => this.onResize());
+
+    // モバイルのピンチズームを完全に防止
+    const preventZoom = (e: Event) => e.preventDefault();
+    // Safari iOS のジェスチャーイベント
+    document.addEventListener('gesturestart', preventZoom, { passive: false });
+    document.addEventListener('gesturechange', preventZoom, { passive: false });
+    document.addEventListener('gestureend', preventZoom, { passive: false });
+    // マルチタッチ (Android / 標準ブラウザ)
+    document.addEventListener('touchmove', (e: TouchEvent) => {
+      if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+    // ダブルタップによるズームをリセット (ズーム済みの場合に強制的に戻す)
+    document.addEventListener('touchend', (e: TouchEvent) => {
+      const now = Date.now();
+      if (now - lastTouchEnd < 300) e.preventDefault();
+      lastTouchEnd = now;
+    }, { passive: false });
   }
 
   private updateCameraPosition(): void {
