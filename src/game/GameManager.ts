@@ -76,11 +76,22 @@ export class GameManager {
     this.startRenderLoop();
   }
 
+  /**
+   * スマホ縦画面では仮想パッド分の高さを引いてキャンバスサイズを計算する。
+   * 横画面・PCはフル画面。
+   */
+  private getCanvasSize(): { w: number; h: number } {
+    const isPortrait = window.innerWidth < window.innerHeight && window.innerWidth <= 768;
+    const padReserve = isPortrait ? 185 : 0; // virtual pad 高さ分の余白
+    return { w: window.innerWidth, h: window.innerHeight - padReserve };
+  }
+
   /** Three.js 初期化 */
   private initThree(): void {
     let lastTouchEnd = 0;
+    const { w, h } = this.getCanvasSize();
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(w, h);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -98,7 +109,7 @@ export class GameManager {
     // カメラ（XIのような斜め見下ろしアングル）
     this.camera = new THREE.PerspectiveCamera(
       40,
-      window.innerWidth / window.innerHeight,
+      w / h,
       0.1,
       100,
     );
@@ -147,8 +158,16 @@ export class GameManager {
   private updateCameraPosition(): void {
     const cx = (BOARD_CONFIG.width - 1) / 2;
     const cz = (BOARD_CONFIG.depth - 1) / 2;
-    // XIのような斜め上からの視点
-    this.camera.position.set(cx + 6, 11, cz + 10);
+    const isPortrait = window.innerWidth < window.innerHeight && window.innerWidth <= 768;
+    if (isPortrait) {
+      // 縦画面: 引いた視点でボード全体を収める
+      this.camera.fov = 52;
+      this.camera.position.set(cx + 5, 14, cz + 12);
+    } else {
+      this.camera.fov = 40;
+      this.camera.position.set(cx + 6, 11, cz + 10);
+    }
+    this.camera.updateProjectionMatrix();
     this.camera.lookAt(cx, 0, cz);
   }
 
@@ -448,9 +467,11 @@ export class GameManager {
 
   /** リサイズ処理 */
   private onResize(): void {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const { w, h } = this.getCanvasSize();
+    this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(w, h);
+    this.updateCameraPosition();
   }
 
   /** クリーンアップ */

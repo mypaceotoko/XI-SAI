@@ -66,7 +66,8 @@ export class Menu {
           border-radius: 8px;
           cursor: pointer;
           transition: transform 0.1s, box-shadow 0.2s;
-          pointer-events: auto;
+          /* pointer-events は親 (#menu-overlay) から継承させる。
+             overlay が非表示時は none、表示時は auto になる */
         }
         .menu-btn:hover {
           transform: scale(1.05);
