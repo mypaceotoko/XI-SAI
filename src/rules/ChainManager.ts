@@ -1,8 +1,15 @@
 import { Board } from '@/board/Board';
-import { ScoreData, ClearGroup } from '@/types';
+import { ScoreData, ClearGroup, DIR_VECTORS } from '@/types';
 import { findClearableGroups, findHappyOneCandidates } from './MatchRule';
+import { getTopFace } from '@/dice/Dice';
 
 const CLEAR_ANIMATION_SPEED = 0.025;
+
+/**
+ * 後乗せコンボの猶予ウィンドウ (0〜1 の clearProgress 比率)
+ * 0.40 ≈ 267ms at 60fps — この進行度に達するまで後乗せ可能
+ */
+const COMBO_GRACE_THRESHOLD = 0.40;
 
 /** スコア計算のベースポイント */
 const BASE_POINTS: Record<number, number> = {
@@ -109,9 +116,64 @@ export class ChainManager {
     }
   }
 
+  /**
+   * 後乗せコンボ: 猶予ウィンドウ内の消去グループに隣接する
+   * 同じ出目のサイコロを巻き込んで一緒に消す
+   */
+  private checkLateJoiners(): void {
+    // clearProgress が猶予ウィンドウ内の消去中サイコロだけを対象にする
+    const graceDice = this.board.getAllDice().filter(
+      d => d.clearing && d.clearProgress < COMBO_GRACE_THRESHOLD,
+    );
+    if (graceDice.length === 0) return;
+
+    const joined = new Set<number>(); // 今回のフレームで追加したIDの重複防止
+
+    for (const clearing of graceDice) {
+      const faceValue = getTopFace(clearing);
+
+      for (const dv of Object.values(DIR_VECTORS)) {
+        const neighborPos = {
+          x: clearing.pos.x + dv.x,
+          z: clearing.pos.z + dv.z,
+        };
+        const neighbor = this.board.getDiceAt(neighborPos);
+        if (!neighbor) continue;
+        if (neighbor.clearing) continue;       // すでに消去中
+        if (neighbor.moving) continue;         // 移動完了を待つ
+        if (joined.has(neighbor.id)) continue; // 今フレームで追加済み
+
+        if (getTopFace(neighbor) === faceValue) {
+          // 後乗せコンボ成立 — 消去グループへ追加
+          neighbor.clearing = true;
+          neighbor.clearProgress = 0;
+          joined.add(neighbor.id);
+
+          // スコア加算
+          const basePoints = BASE_POINTS[faceValue] || 100;
+          this.score.score += basePoints * Math.max(1, this.score.chainCount);
+          this.score.totalCleared++;
+          this.score.combo++;
+          if (this.score.combo > this.score.maxCombo) {
+            this.score.maxCombo = this.score.combo;
+          }
+
+          this.onClear?.([{
+            diceIds: [neighbor.id],
+            faceValue,
+            isHappyOne: false,
+          }]);
+        }
+      }
+    }
+  }
+
   /** 消去アニメーション更新 */
   update(): boolean {
     if (!this.isClearing) return false;
+
+    // 後乗せコンボチェック（進行度更新より前に実行）
+    this.checkLateJoiners();
 
     let allDone = true;
     const clearingDice = this.board.getAllDice().filter(d => d.clearing);

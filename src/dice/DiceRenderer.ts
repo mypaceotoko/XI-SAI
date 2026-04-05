@@ -165,37 +165,65 @@ export function updateDiceMeshPosition(mesh: THREE.Mesh, dice: DiceData): void {
   }
 }
 
-/** 消去アニメーション更新 */
+/** 消去アニメーション更新 — 地面に吸い込まれる演出 */
 export function updateDiceClearAnimation(mesh: THREE.Mesh, dice: DiceData): void {
   if (!dice.clearing) return;
 
-  const t = dice.clearProgress;
+  const t = dice.clearProgress; // 0→1 linear
 
-  // フェーズ1 (0~0.3): 点滅・発光
-  // フェーズ2 (0.3~1.0): 沈み込み・縮小
-  const scale = t < 0.3
-    ? 1 + Math.sin(t / 0.3 * Math.PI * 3) * 0.1
-    : Math.max(0, 1 - (t - 0.3) / 0.7);
-  const y = t > 0.3
-    ? (DICE_SIZE / 2) * Math.max(0, 1 - (t - 0.3) / 0.7 * 1.5)
-    : DICE_SIZE / 2;
+  // ────────────────────────────────────────────────────────────────
+  // フェーズ1 (t: 0 → 0.12) : マッチフラッシュ
+  //   スケールが一瞬膨らみ「揃った！」の手応えを演出
+  // ────────────────────────────────────────────────────────────────
+  if (t < 0.12) {
+    const flashT = t / 0.12;                          // 0→1
+    const flashScale = 1.0 + Math.sin(flashT * Math.PI) * 0.14;
+    mesh.scale.setScalar(flashScale);
+    mesh.position.y = DICE_SIZE / 2;
 
-  mesh.scale.setScalar(scale);
-  mesh.position.y = Math.max(-0.2, y);
+    const materials = mesh.material as THREE.MeshStandardMaterial[];
+    if (Array.isArray(materials)) {
+      materials.forEach(m => {
+        m.emissive = new THREE.Color(0xffffaa);
+        m.emissiveIntensity = Math.sin(flashT * Math.PI) * 2.5;
+        m.transparent = false;
+        m.opacity = 1.0;
+      });
+    }
+    return;
+  }
 
-  // 発光エフェクト
+  // ────────────────────────────────────────────────────────────────
+  // フェーズ2 (t: 0.12 → 1.0) : 地面への沈み込み
+  //   easeInQuart: 序盤ゆっくり → 終盤一気に吸い込まれる
+  // ────────────────────────────────────────────────────────────────
+  const sinkT = (t - 0.12) / 0.88;                   // 0→1 (sink phase)
+  const eased = sinkT * sinkT * sinkT * sinkT;        // easeInQuart
+
+  // 位置: 沈み込み (終盤急加速)
+  const SINK_DEPTH = 0.65;
+  mesh.position.y = DICE_SIZE / 2 - eased * SINK_DEPTH;
+
+  // スケール: 横は維持しつつ縦だけ潰れる → 吸い込まれ感
+  const scaleXZ = Math.max(0, 1.0 - sinkT * 0.20);   // 1.0 → 0.80
+  const scaleY  = Math.max(0, 1.0 - sinkT * 0.55);   // 1.0 → 0.45
+  mesh.scale.set(scaleXZ, scaleY, scaleXZ);
+
+  // 透明度: 沈み込みの中盤から徐々にフェードアウト
+  const opacity = sinkT < 0.35
+    ? 1.0
+    : Math.max(0, 1.0 - (sinkT - 0.35) / 0.65);
+
+  // 発光: フラッシュの余韻が消えながら沈む
+  const emissiveIntensity = Math.max(0, 1.2 * (1.0 - sinkT));
+
   const materials = mesh.material as THREE.MeshStandardMaterial[];
   if (Array.isArray(materials)) {
-    const emissiveIntensity = t < 0.3
-      ? Math.abs(Math.sin(t / 0.3 * Math.PI * 3)) * 2
-      : Math.max(0, 1 - (t - 0.3) / 0.7);
     materials.forEach(m => {
       m.emissive = new THREE.Color(0xffffaa);
       m.emissiveIntensity = emissiveIntensity;
-      if (t > 0.5) {
-        m.transparent = true;
-        m.opacity = Math.max(0, 1 - (t - 0.5) / 0.5);
-      }
+      m.transparent = true;
+      m.opacity = opacity;
     });
   }
 }
