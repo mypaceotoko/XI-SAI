@@ -106,9 +106,10 @@ export class PlayerRenderer {
         const groundY = PLAYER_SIZE;
         baseY = lerp(diceY, groundY, t);
       } else if (player.moveType === 'ride_roll') {
-        // サイコロに乗って転がる: サイコロ上の高さ + 少し揺れ
-        baseY = DICE_HEIGHT + PLAYER_SIZE;
-        baseY += Math.sin(t * Math.PI) * 0.15;
+        // サイコロに乗って転がる: サイコロの円弧に追従
+        const r = DICE_HEIGHT * Math.SQRT2 / 2;
+        const diceArcY = r * Math.sin(Math.PI / 4 + player.moveProgress * Math.PI / 2);
+        baseY = diceArcY + DICE_HEIGHT / 2 + PLAYER_SIZE;
       }
     }
 

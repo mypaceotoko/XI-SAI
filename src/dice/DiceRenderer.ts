@@ -130,14 +130,38 @@ export function createDiceMesh(dice: DiceData): THREE.Mesh {
 /** サイコロMeshの位置を更新 */
 export function updateDiceMeshPosition(mesh: THREE.Mesh, dice: DiceData): void {
   if (dice.moving && dice.moveFrom) {
-    const t = easeOutCubic(dice.moveProgress);
+    const rawT = dice.moveProgress;          // 0→1 線形
+    const t    = easeOutCubic(rawT);         // イージング（位置用）
+
+    const dx = dice.pos.x - dice.moveFrom.x; // +1=east, -1=west
+    const dz = dice.pos.z - dice.moveFrom.z; // +1=south, -1=north
+
+    // ─── 回転アニメーション ───────────────────────────────────────
+    // テクスチャはロール開始時点ですでにポスト状態に更新済み。
+    // そのため「逆回転」方式を採用:
+    //   t=0 → angle=π/2 でプリ状態の面が視覚的に上を向く
+    //   t=1 → angle=0  でポスト状態の面が正しく上を向く
+    // この方式なら補正なしでテクスチャが自然に見える。
+    const angle = (1 - rawT) * Math.PI / 2;
+    mesh.rotation.x = -dz * angle;  // south(+z): −angle  north(−z): +angle
+    mesh.rotation.z =  dx * angle;  // east(+x):  +angle  west(−x): −angle
+    mesh.rotation.y = 0;
+
+    // ─── アーク高さ（物理ベース） ─────────────────────────────────
+    // サイコロは先端エッジを軸に90°転がる。
+    // 中心はエッジからの距離 r = DICE_SIZE*√2/2 の円弧を描く。
+    // 逆回転なので角度は π/4 → 3π/4 と変化 → sin は 0.5 → 1.0 → 0.5 の弧。
+    const r = DICE_SIZE * Math.SQRT2 / 2; // ≈ 0.636
+    const y = r * Math.sin(Math.PI / 4 + rawT * Math.PI / 2);
+
     mesh.position.set(
       lerp(dice.moveFrom.x, dice.pos.x, t),
-      DICE_SIZE / 2,
+      y,
       lerp(dice.moveFrom.z, dice.pos.z, t),
     );
   } else {
     mesh.position.set(dice.pos.x, DICE_SIZE / 2, dice.pos.z);
+    mesh.rotation.set(0, 0, 0);
   }
 }
 
