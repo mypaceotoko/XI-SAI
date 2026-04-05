@@ -92,6 +92,7 @@ export class GameManager {
 
   /** Three.js 初期化 */
   private initThree(): void {
+    let lastTouchEnd = 0;
     const { w, h } = this.getCanvasSize();
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(w, h);
@@ -156,10 +157,17 @@ export class GameManager {
       if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
 
-    // ※ touchend のダブルタップ防止は削除。
-    //   ダブルタップズームは touch-action:none + user-scalable=no で防止済み。
-    //   残しておくと万一ズームが起きた際にユーザーのダブルタップリセット操作まで
-    //   塞いでしまうため削除する。
+    // ダブルタップズーム防止（スマート版）
+    // - 通常時(scale≒1): ダブルタップを preventDefault でブロック
+    // - ズーム済み(scale>1): ダブルタップを許可し、ユーザーがリセットできるようにする
+    document.addEventListener('touchend', (e: TouchEvent) => {
+      const now = Date.now();
+      const scale = window.visualViewport?.scale ?? 1;
+      if (now - lastTouchEnd < 300 && scale <= 1.01) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, { passive: false });
   }
 
   private updateCameraPosition(): void {
