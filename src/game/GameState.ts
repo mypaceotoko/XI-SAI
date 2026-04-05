@@ -28,6 +28,6 @@ export class GameState {
 
   /** プレイヤーが操作可能か */
   canPlayerAct(): boolean {
-    return this.phase === 'playing';
+    return this.phase === 'playing' || this.phase === 'clearing';
   }
 }
