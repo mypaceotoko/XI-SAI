@@ -6,10 +6,10 @@ import { getTopFace } from '@/dice/Dice';
 const CLEAR_ANIMATION_SPEED = 0.0016; // ~10秒で沈む
 
 /**
- * 後乗せコンボの猶予ウィンドウ (0〜1 の clearProgress 比率)
- * 0.40 ≈ 267ms at 60fps — この進行度に達するまで後乗せ可能
+ * 後乗せコンボの猶予ウィンドウ: アニメ速度に依存せず約500ms固定
+ * 30フレーム × CLEAR_ANIMATION_SPEED = clearProgress 換算値
  */
-const COMBO_GRACE_THRESHOLD = 0.40;
+const COMBO_GRACE_THRESHOLD = 30 * CLEAR_ANIMATION_SPEED; // ≈500ms
 
 /** スコア計算のベースポイント */
 const BASE_POINTS: Record<number, number> = {

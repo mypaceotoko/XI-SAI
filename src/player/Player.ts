@@ -78,8 +78,8 @@ export class Player {
         this.data.level = 'on_dice';
         this.data.ridingDiceId = diceAtTarget.id;
         return 'climb';
-      } else if (!diceAtTarget) {
-        // 隣が空き → 地面を歩く
+      } else if (!diceAtTarget || diceAtTarget.clearing) {
+        // 隣が空き or 沈みかけのサイコロ → 地面を歩ける
         this.startMove(targetPos, 'walk');
         return 'walk';
       }
@@ -138,7 +138,8 @@ export class Player {
     };
 
     if (!this.board.isInBounds(targetPos)) return null;
-    if (this.board.getDiceAt(targetPos)) return null; // 隣にサイコロがあれば降りられない
+    const blockingDice = this.board.getDiceAt(targetPos);
+    if (blockingDice && !blockingDice.clearing) return null; // 沈みかけ以外のサイコロがあれば降りられない
 
     this.startMove(targetPos, 'descend');
     this.data.level = 'ground';
