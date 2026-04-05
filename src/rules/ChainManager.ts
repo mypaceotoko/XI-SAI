@@ -3,7 +3,7 @@ import { ScoreData, ClearGroup, DIR_VECTORS } from '@/types';
 import { findClearableGroups, findHappyOneCandidates } from './MatchRule';
 import { getTopFace } from '@/dice/Dice';
 
-const CLEAR_ANIMATION_SPEED = 0.025;
+const CLEAR_ANIMATION_SPEED = 0.008; // ~2秒で沈む (旧: 0.025 = ~0.7秒)
 
 /**
  * 後乗せコンボの猶予ウィンドウ (0〜1 の clearProgress 比率)
