@@ -92,7 +92,7 @@ export class GameManager {
 
   /** Three.js 初期化 */
   private initThree(): void {
-    let lastTouchEnd = 0;
+    let lastTouchStart = 0;
     const { w, h } = this.getCanvasSize();
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(w, h);
@@ -149,24 +149,21 @@ export class GameManager {
     document.addEventListener('gesturechange', prevent, { passive: false });
     document.addEventListener('gestureend',   prevent, { passive: false });
 
-    // 全ブラウザ: 2本指タッチを touchstart/touchmove 両方で阻止
+    // 全ブラウザ: 2本指タッチ & ダブルタップズームを touchstart で阻止
+    // touchstart で preventDefault する方が iOS では確実（touchend より先に評価される）
     document.addEventListener('touchstart', (e: TouchEvent) => {
-      if (e.touches.length > 1) e.preventDefault();
+      if (e.touches.length > 1) {
+        e.preventDefault(); // ピンチズーム阻止
+        return;
+      }
+      const now = Date.now();
+      if (now - lastTouchStart < 300) {
+        e.preventDefault(); // ダブルタップズーム阻止
+      }
+      lastTouchStart = now;
     }, { passive: false });
     document.addEventListener('touchmove', (e: TouchEvent) => {
       if (e.touches.length > 1) e.preventDefault();
-    }, { passive: false });
-
-    // ダブルタップズーム防止（スマート版）
-    // - 通常時(scale≒1): ダブルタップを preventDefault でブロック
-    // - ズーム済み(scale>1): ダブルタップを許可し、ユーザーがリセットできるようにする
-    document.addEventListener('touchend', (e: TouchEvent) => {
-      const now = Date.now();
-      const scale = window.visualViewport?.scale ?? 1;
-      if (now - lastTouchEnd < 300 && scale <= 1.01) {
-        e.preventDefault();
-      }
-      lastTouchEnd = now;
     }, { passive: false });
   }
 

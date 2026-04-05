@@ -23,6 +23,7 @@ export class VirtualPad {
           z-index: 50;
           display: none;
           pointer-events: auto;
+          touch-action: none;
         }
         @media (max-width: 768px), (hover: none) {
           #virtual-pad { display: block; }
@@ -75,10 +76,14 @@ export class VirtualPad {
         .vpad-btn--descend:active {
           background: rgba(255, 200, 50, 0.4);
         }
+        .vpad-grid {
+          touch-action: none;
+        }
         .vpad-empty {
           width: 100%;
           height: 100%;
           pointer-events: none;
+          touch-action: none;
         }
       </style>
       <div class="vpad-grid">
