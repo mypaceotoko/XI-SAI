@@ -1,6 +1,6 @@
 import { Board } from '@/board/Board';
 import { ScoreData, ClearGroup, DIR_VECTORS } from '@/types';
-import { findClearableGroups, findHappyOneCandidates } from './MatchRule';
+import { findClearableGroups } from './MatchRule';
 import { getTopFace } from '@/dice/Dice';
 
 const CLEAR_ANIMATION_SPEED = 0.0016; // ~10秒で沈む
@@ -183,27 +183,6 @@ export class ChainManager {
       if (dice.clearProgress < 1) {
         allDone = false;
       }
-    }
-
-    // Happy One チェック（消去中に隣接する1を検出）
-    const happyOnes = findHappyOneCandidates(this.board);
-    if (happyOnes.length > 0) {
-      for (const group of happyOnes) {
-        for (const id of group.diceIds) {
-          const dice = this.board.getDiceById(id);
-          if (dice && !dice.clearing) {
-            dice.clearing = true;
-            dice.clearProgress = 0;
-            allDone = false;
-
-            // Happy One スコア
-            const basePoints = BASE_POINTS[1];
-            this.score.score += basePoints * this.score.chainCount;
-            this.score.totalCleared++;
-          }
-        }
-      }
-      this.onClear?.(happyOnes);
     }
 
     if (allDone) {

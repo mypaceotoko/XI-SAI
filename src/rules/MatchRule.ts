@@ -63,11 +63,9 @@ export function findClearableGroups(board: Board): ClearGroup[] {
     if (visited.has(dice.id)) continue;
 
     const faceValue = getTopFace(dice);
-    if (faceValue === 1) {
-      // 1は単独では消えない（HappyOneで別処理）
-      visited.add(dice.id);
-      continue;
-    }
+    // 1の目は2個以上隣接で消える（HappyOne特殊ルール廃止）
+    // 他の目と同じ「N個以上隣接」ルールに統一。ただし最低2個必要。
+    const minCount = Math.max(faceValue, 2);
 
     const group: number[] = [];
 
@@ -94,8 +92,8 @@ export function findClearableGroups(board: Board): ClearGroup[] {
       }
     }
 
-    // 消去条件: N の目は N個以上
-    if (group.length >= faceValue) {
+    // 消去条件: N の目は N個以上（ただし最低2個）
+    if (group.length >= minCount) {
       result.push({
         diceIds: group,
         faceValue,
