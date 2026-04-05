@@ -92,7 +92,6 @@ export class GameManager {
 
   /** Three.js 初期化 */
   private initThree(): void {
-    let lastTouchEnd = 0;
     const { w, h } = this.getCanvasSize();
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(w, h);
@@ -141,7 +140,7 @@ export class GameManager {
     // リサイズ対応
     window.addEventListener('resize', () => this.onResize());
 
-    // ===== モバイルのピンチズームを完全に防止 =====
+    // ===== モバイルのピンチズームを防止 =====
     const prevent = (e: Event) => e.preventDefault();
 
     // Safari iOS: ジェスチャーイベント
@@ -149,36 +148,18 @@ export class GameManager {
     document.addEventListener('gesturechange', prevent, { passive: false });
     document.addEventListener('gestureend',   prevent, { passive: false });
 
-    // 全ブラウザ: マルチタッチの touchstart でズーム開始を即阻止
-    // (touchmove だけでは pinch が始まった後になるため不十分)
+    // 全ブラウザ: 2本指タッチを touchstart/touchmove 両方で阻止
     document.addEventListener('touchstart', (e: TouchEvent) => {
       if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
-
-    // マルチタッチの touchmove も念のため阻止
     document.addEventListener('touchmove', (e: TouchEvent) => {
       if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
 
-    // ダブルタップズーム防止
-    document.addEventListener('touchend', (e: TouchEvent) => {
-      const now = Date.now();
-      if (now - lastTouchEnd < 300) e.preventDefault();
-      lastTouchEnd = now;
-    }, { passive: false });
-
-    // visualViewport でズームを検知して強制リセット (iOS 13+ 対策)
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', () => {
-        if ((window.visualViewport?.scale ?? 1) > 1.01) {
-          const meta = document.querySelector('meta[name="viewport"]') as HTMLMetaElement | null;
-          if (meta) {
-            // initial-scale を再セットすることでブラウザにスケール1を再通知
-            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-          }
-        }
-      });
-    }
+    // ※ touchend のダブルタップ防止は削除。
+    //   ダブルタップズームは touch-action:none + user-scalable=no で防止済み。
+    //   残しておくと万一ズームが起きた際にユーザーのダブルタップリセット操作まで
+    //   塞いでしまうため削除する。
   }
 
   private updateCameraPosition(): void {
@@ -248,10 +229,23 @@ export class GameManager {
     this.appEl.appendChild(style);
     this.appEl.appendChild(this.zoomBtnEl);
 
+    /** ブラウザのビューポートズームをリセットする */
+    const resetBrowserZoom = () => {
+      const meta = document.querySelector('meta[name="viewport"]') as HTMLMetaElement | null;
+      if (!meta) return;
+      // 一瞬 user-scalable=yes を許可してから initial-scale=1 を再通知することで
+      // iOS Safari でもスケールをリセットできる場合がある
+      meta.content = 'width=device-width, initial-scale=1, maximum-scale=2, user-scalable=yes';
+      requestAnimationFrame(() => {
+        meta.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no';
+      });
+    };
+
     const toggle = () => {
       this.zoomLevel = this.zoomLevel === 0 ? 1 : 0;
       this.zoomBtnEl.textContent = this.zoomLevel === 1 ? '🔍−' : '🔍+';
       this.updateCameraPosition();
+      resetBrowserZoom(); // カメラ切替と同時にブラウザズームもリセット
     };
     this.zoomBtnEl.addEventListener('touchend', (e) => { e.preventDefault(); toggle(); }, { passive: false });
     this.zoomBtnEl.addEventListener('click', toggle);
