@@ -86,7 +86,7 @@ export class GameManager {
    */
   private getCanvasSize(): { w: number; h: number } {
     const isPortrait = window.innerWidth < window.innerHeight && window.innerWidth <= 768;
-    const padReserve = isPortrait ? 185 : 0; // virtual pad 高さ分の余白
+    const padReserve = isPortrait ? 240 : 0; // virtual pad 高さ分の余白（70px×3 + gap + bottom）
     return { w: window.innerWidth, h: window.innerHeight - padReserve };
   }
 
@@ -120,10 +120,10 @@ export class GameManager {
     this.updateCameraPosition();
 
     // ライティング
-    const ambientLight = new THREE.AmbientLight(0x445566, 1.0);
+    const ambientLight = new THREE.AmbientLight(0x8899aa, 2.2);
     this.scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffeedd, 1.5);
+    const dirLight = new THREE.DirectionalLight(0xfff4e0, 2.8);
     dirLight.position.set(8, 12, 6);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.set(2048, 2048);
@@ -134,7 +134,7 @@ export class GameManager {
     this.scene.add(dirLight);
 
     // バックライト
-    const backLight = new THREE.DirectionalLight(0x4466aa, 0.4);
+    const backLight = new THREE.DirectionalLight(0x6699cc, 0.9);
     backLight.position.set(-5, 8, -5);
     this.scene.add(backLight);
 

@@ -38,15 +38,15 @@ export class VirtualPad {
         }
         .vpad-grid {
           display: grid;
-          grid-template-columns: 50px 50px 50px;
-          grid-template-rows: 50px 50px 50px;
-          gap: 3px;
+          grid-template-columns: 70px 70px 70px;
+          grid-template-rows: 70px 70px 70px;
+          gap: 4px;
         }
         @media (max-height: 500px) {
           .vpad-grid {
-            grid-template-columns: 44px 44px 44px;
-            grid-template-rows: 44px 44px 44px;
-            gap: 2px;
+            grid-template-columns: 56px 56px 56px;
+            grid-template-rows: 56px 56px 56px;
+            gap: 3px;
           }
         }
         .vpad-btn {
@@ -56,7 +56,7 @@ export class VirtualPad {
           border: 1px solid rgba(255, 255, 255, 0.25);
           border-radius: 10px;
           color: #fff;
-          font-size: 20px;
+          font-size: 26px;
           display: flex;
           align-items: center;
           justify-content: center;
