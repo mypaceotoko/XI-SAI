@@ -141,22 +141,44 @@ export class GameManager {
     // リサイズ対応
     window.addEventListener('resize', () => this.onResize());
 
-    // モバイルのピンチズームを完全に防止
-    const preventZoom = (e: Event) => e.preventDefault();
-    // Safari iOS のジェスチャーイベント
-    document.addEventListener('gesturestart', preventZoom, { passive: false });
-    document.addEventListener('gesturechange', preventZoom, { passive: false });
-    document.addEventListener('gestureend', preventZoom, { passive: false });
-    // マルチタッチ (Android / 標準ブラウザ)
+    // ===== モバイルのピンチズームを完全に防止 =====
+    const prevent = (e: Event) => e.preventDefault();
+
+    // Safari iOS: ジェスチャーイベント
+    document.addEventListener('gesturestart',  prevent, { passive: false });
+    document.addEventListener('gesturechange', prevent, { passive: false });
+    document.addEventListener('gestureend',   prevent, { passive: false });
+
+    // 全ブラウザ: マルチタッチの touchstart でズーム開始を即阻止
+    // (touchmove だけでは pinch が始まった後になるため不十分)
+    document.addEventListener('touchstart', (e: TouchEvent) => {
+      if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+
+    // マルチタッチの touchmove も念のため阻止
     document.addEventListener('touchmove', (e: TouchEvent) => {
       if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
-    // ダブルタップによるズームをリセット (ズーム済みの場合に強制的に戻す)
+
+    // ダブルタップズーム防止
     document.addEventListener('touchend', (e: TouchEvent) => {
       const now = Date.now();
       if (now - lastTouchEnd < 300) e.preventDefault();
       lastTouchEnd = now;
     }, { passive: false });
+
+    // visualViewport でズームを検知して強制リセット (iOS 13+ 対策)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        if ((window.visualViewport?.scale ?? 1) > 1.01) {
+          const meta = document.querySelector('meta[name="viewport"]') as HTMLMetaElement | null;
+          if (meta) {
+            // initial-scale を再セットすることでブラウザにスケール1を再通知
+            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+          }
+        }
+      });
+    }
   }
 
   private updateCameraPosition(): void {
