@@ -73,7 +73,12 @@ export class Board {
   removeDice(id: number): void {
     const dice = this.diceById.get(id);
     if (!dice) return;
-    this.diceMap.delete(posKey(dice.pos));
+    // 別のサイコロが同じ位置を占有済みなら diceMap は触らない
+    // (clearing 中のサイコロの位置に新しいサイコロが転がり込んだ場合)
+    const occupant = this.diceMap.get(posKey(dice.pos));
+    if (occupant && occupant.id === id) {
+      this.diceMap.delete(posKey(dice.pos));
+    }
     this.diceById.delete(id);
   }
 
@@ -119,8 +124,10 @@ export class Board {
     const dv = DIR_VECTORS[direction];
     const newPos: GridPos = { x: dice.pos.x + dv.x, z: dice.pos.z + dv.z };
 
-    // 移動先が盤面外またはサイコロがある場合は転がせない
-    if (!this.isInBounds(newPos) || this.getDiceAt(newPos)) {
+    // 移動先が盤面外、または通常サイコロがある場合は転がせない
+    // clearing 中（沈みかけ）のサイコロは通り抜けてOK
+    const targetDice = this.getDiceAt(newPos);
+    if (!this.isInBounds(newPos) || (targetDice && !targetDice.clearing)) {
       return false;
     }
 

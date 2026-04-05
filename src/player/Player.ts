@@ -57,17 +57,15 @@ export class Player {
         this.data.level = 'on_dice';
         this.data.ridingDiceId = diceAtTarget.id;
         return 'walk';
-      } else if (!diceAtTarget) {
-        // 隣が空き → 乗っているサイコロを転がす
+      } else if (!diceAtTarget || diceAtTarget.clearing) {
+        // 隣が空き or 沈みかけのマス → 乗っているサイコロを転がせる
         if (this.data.ridingDiceId !== null) {
           const rolled = this.board.rollDiceToDirection(this.data.ridingDiceId, direction);
           if (rolled) {
             this.startMove(targetPos, 'ride_roll');
-            // サイコロと一緒に移動するので、ridingDiceIdはそのまま
             return 'ride_roll';
           }
         }
-        // サイコロが転がせない場合は何もしない（自動で降りない）
         return null;
       }
     } else {
