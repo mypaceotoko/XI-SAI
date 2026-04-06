@@ -13,6 +13,8 @@ import { Menu } from '@/ui/Menu';
 import { VirtualPad } from '@/ui/VirtualPad';
 import { AudioManager } from '@/audio/AudioManager';
 import { resetDiceIdCounter } from '@/dice/Dice';
+import { CharacterId, loadCharacter, saveCharacter } from '@/characters/CharacterDef';
+import { generateCharacterPreviews } from '@/characters/CharacterPreview';
 
 const BOARD_CONFIG: BoardConfig = {
   width: 8,
@@ -87,6 +89,10 @@ export class GameManager {
 
   /** BGM: 最初のユーザー操作後に一度だけ開始 */
   private bgmStarted = false;
+
+  // ── キャラクター ─────────────────────────────────────────────
+
+  private selectedCharacter: CharacterId = loadCharacter();
 
   // ─────────────────────────────────────────────────────────────
 
@@ -204,6 +210,8 @@ export class GameManager {
       () => this.restartGame(),
       () => this.resumeGame(),
       () => this.loadHighScores(),
+      () => this.showCharacterSelect(() => this.menu.showModeSelect(this.loadHighScores())),
+      () => this.showCharacterSelect(() => this.menu.showModeSelect(this.loadHighScores())),
     );
 
     this.initTopButtons();
@@ -379,6 +387,23 @@ export class GameManager {
 
   // ── ゲーム状態遷移 ─────────────────────────────────────────
 
+  /** キャラクター選択画面を表示し、確定後に onConfirm を呼ぶ */
+  private showCharacterSelect(onConfirm: () => void): void {
+    const previews = generateCharacterPreviews();
+    this.menu.showCharacterSelect(
+      this.selectedCharacter,
+      previews,
+      (id: CharacterId) => {
+        this.selectedCharacter = id;
+        saveCharacter(id);
+        // インゲームのキャラクターが既に存在する場合は切り替え
+        if (this.playerRenderer) this.playerRenderer.setCharacter(id);
+        onConfirm();
+      },
+      () => this.menu.showTitle(),
+    );
+  }
+
   private startGame(mode: GameMode): void {
     this.currentMode = mode;
     this.cleanup();
@@ -451,7 +476,7 @@ export class GameManager {
 
     this.boardRenderer = new BoardRenderer(this.scene, this.board);
     this.boardRenderer.init();
-    this.playerRenderer = new PlayerRenderer(this.scene);
+    this.playerRenderer = new PlayerRenderer(this.scene, this.selectedCharacter);
 
     this.hud.updateScore(this.chainManager.score);
   }

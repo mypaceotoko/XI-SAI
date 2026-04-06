@@ -1,4 +1,5 @@
 import { GameMode } from '@/types';
+import { CharacterId, CHARACTER_LIST } from '@/characters/CharacterDef';
 
 /** ハイスコアレコード（モードごと） */
 export interface HighScores {
@@ -8,14 +9,16 @@ export interface HighScores {
 }
 
 /**
- * メニュー画面（タイトル、モード選択、ゲームオーバー、クリア、ポーズ）
+ * メニュー画面（タイトル、キャラ選択、モード選択、ゲームオーバー、クリア、ポーズ）
  */
 export class Menu {
   private container: HTMLElement;
-  private onStart:        ((mode: GameMode) => void) | null = null;
-  private onRestart:      (() => void) | null = null;
-  private onResume:       (() => void) | null = null;
-  private getHighScores:  (() => HighScores) | null = null;
+  private onStart:           ((mode: GameMode) => void)  | null = null;
+  private onRestart:         (() => void)                | null = null;
+  private onResume:          (() => void)                | null = null;
+  private getHighScores:     (() => HighScores)          | null = null;
+  private onTitleStart:      (() => void)                | null = null;
+  private onChangeCharacter: (() => void)                | null = null;
 
   constructor(parentEl: HTMLElement) {
     this.container = document.createElement('div');
@@ -35,6 +38,7 @@ export class Menu {
           opacity: 0;
           transition: opacity 0.3s;
           pointer-events: none;
+          overflow-y: auto;
         }
         #menu-overlay.visible { opacity: 1; pointer-events: auto; }
 
@@ -54,7 +58,7 @@ export class Menu {
           margin-bottom: 28px;
           text-align: center;
         }
-        .menu-content { text-align: center; padding: 0 16px; }
+        .menu-content { text-align: center; padding: 0 16px 12px; }
 
         /* スコア表示 */
         .menu-score-big {
@@ -92,7 +96,7 @@ export class Menu {
           -webkit-tap-highlight-color: transparent;
           user-select: none;
         }
-        .menu-btn:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(0,170,119,0.5); }
+        .menu-btn:hover  { transform: scale(1.05); box-shadow: 0 0 20px rgba(0,170,119,0.5); }
         .menu-btn:active { transform: scale(0.95); }
 
         /* モード選択カード */
@@ -123,6 +127,47 @@ export class Menu {
         .mode-card-hs     { font-size: 11px; color: #44ffaa; margin-top: 4px; }
         .mode-card-hs span { color: #fff; font-weight: bold; }
 
+        /* キャラクター選択 */
+        .char-grid {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 16px;
+          justify-content: center;
+          flex-wrap: wrap;
+          max-width: 400px;
+        }
+        .char-card {
+          background: rgba(255,255,255,0.07);
+          border: 2px solid rgba(255,255,255,0.15);
+          border-radius: 14px;
+          padding: 10px 8px 8px;
+          cursor: pointer;
+          text-align: center;
+          transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+          touch-action: none;
+          -webkit-tap-highlight-color: transparent;
+          user-select: none;
+          width: 108px;
+          flex-shrink: 0;
+        }
+        .char-card:hover  { background: rgba(0,255,170,0.08); }
+        .char-card:active { transform: scale(0.96); }
+        .char-card.selected {
+          border-color: rgba(0,255,170,0.75);
+          background: rgba(0,255,170,0.13);
+          box-shadow: 0 0 14px rgba(0,255,170,0.35);
+        }
+        .char-preview {
+          width: 90px;
+          height: 90px;
+          border-radius: 10px;
+          display: block;
+          margin: 0 auto 6px;
+          background: rgba(255,255,255,0.04);
+        }
+        .char-name { font-size: 12px; font-weight: 800; color: #fff; margin-bottom: 3px; }
+        .char-desc { font-size: 10px; color: #aaa; line-height: 1.35; }
+
         /* クリア時タイトル */
         .menu-title-clear {
           font-size: 52px;
@@ -136,9 +181,9 @@ export class Menu {
         }
         @keyframes clear-bounce {
           0%, 100% { transform: scale(1); }
-          30% { transform: scale(1.2); }
-          50% { transform: scale(0.95); }
-          70% { transform: scale(1.05); }
+          30%  { transform: scale(1.2); }
+          50%  { transform: scale(0.95); }
+          70%  { transform: scale(1.05); }
         }
 
         .menu-controls {
@@ -156,10 +201,18 @@ export class Menu {
         }
 
         @media (max-width: 600px) {
-          .menu-title { font-size: 36px; }
-          .menu-btn { padding: 10px 22px; font-size: 15px; }
-          .mode-grid { max-width: 280px; }
+          .menu-title  { font-size: 36px; }
+          .menu-btn    { padding: 10px 22px; font-size: 15px; }
+          .mode-grid   { max-width: 280px; }
           .menu-title-clear { font-size: 40px; }
+          .char-card   { width: 90px; padding: 8px 6px 6px; }
+          .char-preview { width: 74px; height: 74px; }
+          .char-name   { font-size: 11px; }
+        }
+        @media (max-width: 380px) {
+          .char-grid   { gap: 7px; }
+          .char-card   { width: 80px; }
+          .char-preview { width: 66px; height: 66px; }
         }
       </style>
       <div class="menu-content" id="menu-content"></div>
@@ -170,15 +223,19 @@ export class Menu {
   // ── コールバック設定 ──────────────────────────────────────────
 
   setCallbacks(
-    onStart:       (mode: GameMode) => void,
-    onRestart:     () => void,
-    onResume:      () => void,
-    getHighScores: () => HighScores,
+    onStart:           (mode: GameMode) => void,
+    onRestart:         () => void,
+    onResume:          () => void,
+    getHighScores:     () => HighScores,
+    onTitleStart:      () => void,
+    onChangeCharacter: () => void,
   ): void {
-    this.onStart       = onStart;
-    this.onRestart     = onRestart;
-    this.onResume      = onResume;
-    this.getHighScores = getHighScores;
+    this.onStart           = onStart;
+    this.onRestart         = onRestart;
+    this.onResume          = onResume;
+    this.getHighScores     = getHighScores;
+    this.onTitleStart      = onTitleStart;
+    this.onChangeCharacter = onChangeCharacter;
   }
 
   // ── 内部ユーティリティ ────────────────────────────────────────
@@ -195,10 +252,6 @@ export class Menu {
       handler();
     }, { passive: false } as EventListenerOptions);
     btn.addEventListener('click', handler);
-  }
-
-  private bindCard(selector: string, handler: () => void): void {
-    this.bindBtn(selector, handler);
   }
 
   private hsText(score: number): string {
@@ -219,9 +272,51 @@ export class Menu {
         <kbd>R</kbd> Restart&nbsp;&nbsp;<kbd>Esc</kbd> Pause
       </div>
     `;
-    this.bindBtn('#btn-start', () => {
-      this.showModeSelect(this.getHighScores?.());
+    this.bindBtn('#btn-start', () => this.onTitleStart?.());
+    this.show();
+  }
+
+  /** キャラクター選択画面 */
+  showCharacterSelect(
+    currentId: CharacterId,
+    previews: Record<CharacterId, string>,
+    onConfirm: (id: CharacterId) => void,
+    onBack?: () => void,
+  ): void {
+    let selected: CharacterId = currentId;
+
+    const cardHtml = CHARACTER_LIST.map(c => `
+      <div class="char-card${c.id === currentId ? ' selected' : ''}" data-charid="${c.id}" id="char-${c.id}">
+        <img class="char-preview" src="${previews[c.id]}" alt="${c.name}">
+        <div class="char-name">${c.name}</div>
+        <div class="char-desc">${c.description}</div>
+      </div>
+    `).join('');
+
+    this.content().innerHTML = `
+      <div class="menu-title" style="font-size:28px;margin-bottom:14px;">キャラクター選択</div>
+      <div class="char-grid">${cardHtml}</div>
+      <button class="menu-btn" id="btn-confirm-char" style="font-size:15px;padding:11px 26px;">
+        このキャラでプレイ ▶
+      </button>
+      ${onBack ? '<button class="menu-btn" id="btn-back" style="background:rgba(60,60,60,0.7);font-size:13px;padding:8px 18px;">← BACK</button>' : ''}
+    `;
+
+    // カード選択
+    this.container.querySelectorAll('.char-card').forEach(card => {
+      const charId = card.getAttribute('data-charid') as CharacterId;
+      const selectCard = () => {
+        selected = charId;
+        this.container.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+      };
+      card.addEventListener('touchend', (e) => { e.preventDefault(); selectCard(); }, { passive: false } as EventListenerOptions);
+      card.addEventListener('click', selectCard);
     });
+
+    this.bindBtn('#btn-confirm-char', () => onConfirm(selected));
+    if (onBack) this.bindBtn('#btn-back', onBack);
+
     this.show();
   }
 
@@ -249,10 +344,10 @@ export class Menu {
       </div>
       <button class="menu-btn" id="btn-back" style="background:rgba(80,80,80,0.7);font-size:14px;padding:8px 20px;">← BACK</button>
     `;
-    this.bindCard('#mode-endless',    () => this.onStart?.('endless'));
-    this.bindCard('#mode-timeattack', () => this.onStart?.('timeattack'));
-    this.bindCard('#mode-combo',      () => this.onStart?.('combo'));
-    this.bindBtn('#btn-back', () => this.showTitle());
+    this.bindBtn('#mode-endless',    () => this.onStart?.('endless'));
+    this.bindBtn('#mode-timeattack', () => this.onStart?.('timeattack'));
+    this.bindBtn('#mode-combo',      () => this.onStart?.('combo'));
+    this.bindBtn('#btn-back', () => this.onTitleStart?.());
     this.show();
   }
 
@@ -265,9 +360,11 @@ export class Menu {
       ${isHighScore ? '<div class="menu-hs" style="color:#ffdd44;font-size:15px;animation:clear-bounce 0.6s both;">🏆 NEW HIGH SCORE!</div>' : ''}
       <button class="menu-btn" id="btn-retry">RETRY</button>
       <button class="menu-btn" id="btn-mode" style="background:rgba(60,60,100,0.8);font-size:14px;padding:8px 20px;">MODE SELECT</button>
+      <button class="menu-btn" id="btn-change-char" style="background:rgba(40,80,60,0.8);font-size:14px;padding:8px 20px;">キャラ変更</button>
     `;
-    this.bindBtn('#btn-retry', () => this.onRestart?.());
-    this.bindBtn('#btn-mode',  () => this.showModeSelect(this.getHighScores?.()));
+    this.bindBtn('#btn-retry',       () => this.onRestart?.());
+    this.bindBtn('#btn-mode',        () => this.showModeSelect(this.getHighScores?.()));
+    this.bindBtn('#btn-change-char', () => this.onChangeCharacter?.());
     this.show();
   }
 
@@ -280,9 +377,11 @@ export class Menu {
       ${isHighScore ? '<div class="menu-hs" style="color:#ffdd44;font-size:15px;">🏆 NEW HIGH SCORE!</div>' : ''}
       <button class="menu-btn" id="btn-retry" style="background:linear-gradient(135deg,#ffaa00,#ff6600);">PLAY AGAIN</button>
       <button class="menu-btn" id="btn-mode" style="background:rgba(60,60,100,0.8);font-size:14px;padding:8px 20px;">MODE SELECT</button>
+      <button class="menu-btn" id="btn-change-char" style="background:rgba(40,80,60,0.8);font-size:14px;padding:8px 20px;">キャラ変更</button>
     `;
-    this.bindBtn('#btn-retry', () => this.onRestart?.());
-    this.bindBtn('#btn-mode',  () => this.showModeSelect(this.getHighScores?.()));
+    this.bindBtn('#btn-retry',       () => this.onRestart?.());
+    this.bindBtn('#btn-mode',        () => this.showModeSelect(this.getHighScores?.()));
+    this.bindBtn('#btn-change-char', () => this.onChangeCharacter?.());
     this.show();
   }
 
@@ -298,8 +397,7 @@ export class Menu {
     this.show();
   }
 
-  show():  void { this.container.classList.add('visible'); }
-  hide():  void { this.container.classList.remove('visible'); }
-
+  show():    void { this.container.classList.add('visible'); }
+  hide():    void { this.container.classList.remove('visible'); }
   dispose(): void { this.container.remove(); }
 }
