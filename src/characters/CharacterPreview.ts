@@ -31,6 +31,7 @@ function drawPreview(id: CharacterId): string {
     case 'ball':   return drawBall();
     case 'insect': return drawInsect();
     case 'tank':   return drawTank();
+    case 'mypace': return drawMypace();
   }
 }
 
@@ -410,6 +411,118 @@ function drawBird(): string {
   // 副ハイライト
   ctx.fillStyle = 'rgba(255,255,255,0.45)';
   ctx.beginPath(); ctx.arc(EX + 3, EY - 1.5, 1.5, 0, Math.PI * 2); ctx.fill();
+
+  return ctx.canvas.toDataURL();
+}
+
+// ── マイペース男（正面チビキャラ） ──────────────────────────────────
+
+function drawMypace(): string {
+  const ctx = makeCtx(); // 128 × 128
+  const rr = (x: number, y: number, w: number, h: number, r: number | number[]) =>
+    (ctx as unknown as { roundRect: (x:number,y:number,w:number,h:number,r:number|number[])=>void }).roundRect(x, y, w, h, r);
+
+  // ── 靴（最背面） ──────────────────────────────────────────────
+  ctx.fillStyle = '#0e0e14';
+  ctx.beginPath(); rr(35, 104, 24, 16, [5, 5, 3, 3]); ctx.fill();
+  ctx.beginPath(); rr(69, 104, 24, 16, [5, 5, 3, 3]); ctx.fill();
+
+  // ── 脚 ────────────────────────────────────────────────────────
+  ctx.fillStyle = '#141418';
+  ctx.fillRect(40, 88, 14, 20);
+  ctx.fillRect(74, 88, 14, 20);
+
+  // ── 体（黒ジャケット） ────────────────────────────────────────
+  ctx.fillStyle = '#151520';
+  ctx.beginPath(); rr(30, 66, 68, 28, 8); ctx.fill();
+
+  // 白シャツのぞき
+  const sg = ctx.createLinearGradient(60, 66, 68, 66);
+  sg.addColorStop(0, '#e8e8e8');
+  sg.addColorStop(1, '#cccccc');
+  ctx.fillStyle = sg;
+  ctx.fillRect(60, 66, 8, 20);
+
+  // ── 腕 ────────────────────────────────────────────────────────
+  ctx.fillStyle = '#151520';
+  ctx.beginPath(); rr(14, 68, 18, 18, 5); ctx.fill();
+  ctx.beginPath(); rr(96, 68, 18, 18, 5); ctx.fill();
+
+  // ── 大きな丸い手 ──────────────────────────────────────────────
+  ctx.fillStyle = '#dda870';
+  ctx.beginPath(); ctx.arc(23, 83, 11, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(105, 83, 11, 0, Math.PI * 2); ctx.fill();
+  // 手の光沢
+  ctx.fillStyle = 'rgba(255,220,160,0.35)';
+  ctx.beginPath(); ctx.arc(20, 80, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(102, 80, 5, 0, Math.PI * 2); ctx.fill();
+
+  // ── 頭部（大きな丸） ──────────────────────────────────────────
+  const hg = ctx.createRadialGradient(54, 40, 3, 64, 47, 26);
+  hg.addColorStop(0, '#f0d0a0');
+  hg.addColorStop(1, '#cc9055');
+  ctx.fillStyle = hg;
+  ctx.beginPath(); ctx.arc(64, 47, 26, 0, Math.PI * 2); ctx.fill();
+
+  // 耳
+  ctx.fillStyle = '#cc9055';
+  ctx.beginPath(); ctx.arc(37, 47, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(91, 47, 7, 0, Math.PI * 2); ctx.fill();
+  // 耳の内側
+  ctx.fillStyle = '#dd6644';
+  ctx.beginPath(); ctx.arc(37, 47, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(91, 47, 4, 0, Math.PI * 2); ctx.fill();
+
+  // ── スナップバックキャップ ────────────────────────────────────
+  // ドーム
+  ctx.fillStyle = '#0c0c14';
+  ctx.beginPath();
+  ctx.arc(64, 38, 29, -Math.PI, 0);
+  ctx.closePath(); ctx.fill();
+  // バンド
+  ctx.fillStyle = '#1a1a26';
+  ctx.beginPath(); rr(35, 37, 58, 5, 0); ctx.fill();
+  // ブリム（つば）
+  ctx.fillStyle = '#090910';
+  ctx.beginPath(); rr(33, 40, 62, 7, [0, 0, 3, 3]); ctx.fill();
+  // ブリムのハイライト（上面の細い光沢線）
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(35, 41); ctx.lineTo(93, 41); ctx.stroke();
+
+  // 白ロゴ（円）
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.beginPath(); ctx.arc(64, 25, 5.5, 0, Math.PI * 2); ctx.fill();
+  // ロゴ内の小円（ロゴデザイン）
+  ctx.strokeStyle = '#0c0c14';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(64, 25, 3, 0, Math.PI * 2); ctx.stroke();
+
+  // ── 黒サングラス ──────────────────────────────────────────────
+  ctx.fillStyle = '#040408';
+  // 左レンズ
+  ctx.beginPath(); rr(40, 44, 20, 12, 3); ctx.fill();
+  // 右レンズ
+  ctx.beginPath(); rr(68, 44, 20, 12, 3); ctx.fill();
+  // ブリッジ
+  ctx.fillRect(60, 47, 8, 5);
+  // フレームライン（アクセント）
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); rr(40, 44, 20, 12, 3); ctx.stroke();
+  ctx.beginPath(); rr(68, 44, 20, 12, 3); ctx.stroke();
+  // レンズの光沢
+  ctx.fillStyle = 'rgba(80,80,150,0.18)';
+  ctx.beginPath(); rr(42, 45, 8, 4, 2); ctx.fill();
+  ctx.beginPath(); rr(70, 45, 8, 4, 2); ctx.fill();
+
+  // ── 笑顔 ──────────────────────────────────────────────────────
+  ctx.strokeStyle = '#994433';
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(64, 62, 7, 0.15, Math.PI - 0.15, false); // 下半弧 = スマイル
+  ctx.stroke();
 
   return ctx.canvas.toDataURL();
 }

@@ -93,6 +93,7 @@ export class GameManager {
   // ── キャラクター ─────────────────────────────────────────────
 
   private selectedCharacter: CharacterId = loadCharacter();
+  private hiddenCharUnlocked: boolean = localStorage.getItem('xi_sai_unlocked_mypace') === '1';
 
   // ─────────────────────────────────────────────────────────────
 
@@ -401,6 +402,14 @@ export class GameManager {
         onConfirm();
       },
       () => this.menu.showTitle(),
+      this.hiddenCharUnlocked,
+      () => {
+        // 隠しキャラ解放
+        this.hiddenCharUnlocked = true;
+        localStorage.setItem('xi_sai_unlocked_mypace', '1');
+        // キャラ選択を再表示（隠しキャラ表示状態で）
+        this.showCharacterSelect(onConfirm);
+      },
     );
   }
 

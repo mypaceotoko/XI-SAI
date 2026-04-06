@@ -8,6 +8,7 @@ export function buildCharacterMesh(id: CharacterId): THREE.Group {
     case 'insect': return buildInsectMesh();
     case 'tank':   return buildTankMesh();
     case 'bird':   return buildBirdMesh();
+    case 'mypace': return buildMypaceMesh();
   }
 }
 
@@ -326,6 +327,116 @@ function buildBirdMesh(): THREE.Group {
     undefined,
     () => { /* 読み込み失敗 → canvas texture のまま */ },
   );
+
+  return group;
+}
+
+// ── マイペース男（チビキャラ 3D モデル） ─────────────────────────
+
+function buildMypaceMesh(): THREE.Group {
+  const group = new THREE.Group();
+
+  const skinMat   = new THREE.MeshStandardMaterial({ color: 0xdda870, roughness: 0.72 });
+  const blackMat  = new THREE.MeshStandardMaterial({ color: 0x0e0e14, roughness: 0.65 });
+  const whiteMat  = new THREE.MeshStandardMaterial({ color: 0xeeeeee, emissive: 0xbbbbbb, emissiveIntensity: 0.12 });
+  const jacketMat = new THREE.MeshStandardMaterial({ color: 0x13131e, roughness: 0.70 });
+  const glassMat  = new THREE.MeshStandardMaterial({ color: 0x040408, roughness: 0.06, metalness: 0.62 });
+  const smileMat  = new THREE.MeshStandardMaterial({ color: 0x441111, roughness: 0.8 });
+
+  // ── 大きな丸い頭 ──────────────────────────────────────────────
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), skinMat);
+  head.position.y = 0.30;
+  head.castShadow = true;
+  group.add(head);
+
+  // 耳
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.056, 8, 8), skinMat);
+    ear.position.set(side * 0.213, 0.30, 0.0);
+    group.add(ear);
+  }
+
+  // ── スナップバックキャップ ────────────────────────────────────
+  // ドーム（上半球）
+  const capDome = new THREE.Mesh(
+    new THREE.SphereGeometry(0.245, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+    blackMat,
+  );
+  capDome.position.y = 0.38;
+  group.add(capDome);
+
+  // キャップバンド（ドーム底のリング）
+  const band = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.245, 0.245, 0.025, 14),
+    new THREE.MeshStandardMaterial({ color: 0x1c1c26, roughness: 0.6 }),
+  );
+  band.position.y = 0.382;
+  group.add(band);
+
+  // ブリム（つば - 前方に突き出す）
+  const brim = new THREE.Mesh(new THREE.BoxGeometry(0.47, 0.024, 0.20), blackMat);
+  brim.position.set(0, 0.38, -0.20);
+  group.add(brim);
+
+  // キャップの白ロゴ（正面の小さな丸）
+  const logo = new THREE.Mesh(new THREE.CircleGeometry(0.044, 12), whiteMat);
+  logo.position.set(0, 0.42, -0.245);
+  logo.rotation.x = -0.28;
+  group.add(logo);
+
+  // ── 黒いサングラス ────────────────────────────────────────────
+  for (const side of [-1, 1]) {
+    const lens = new THREE.Mesh(new THREE.BoxGeometry(0.090, 0.053, 0.018), glassMat);
+    lens.position.set(side * 0.080, 0.30, -0.222);
+    group.add(lens);
+  }
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.018, 0.016), glassMat);
+  bridge.position.set(0, 0.30, -0.222);
+  group.add(bridge);
+
+  // ── 笑顔（トーラス弧） ────────────────────────────────────────
+  const smile = new THREE.Mesh(
+    new THREE.TorusGeometry(0.054, 0.010, 5, 10, Math.PI * 0.75),
+    smileMat,
+  );
+  smile.position.set(0, 0.18, -0.22);
+  smile.rotation.z = Math.PI; // 上向きに反転してスマイル形状に
+  group.add(smile);
+
+  // ── 体（黒ジャケット） ────────────────────────────────────────
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.20, 0.26), jacketMat);
+  torso.position.y = 0.02;
+  torso.castShadow = true;
+  group.add(torso);
+
+  // 白シャツのぞき（中央のストライプ）
+  const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.090, 0.12, 0.010), whiteMat);
+  shirt.position.set(0, 0.06, -0.131);
+  group.add(shirt);
+
+  // ── 大きな丸い手 ──────────────────────────────────────────────
+  for (const side of [-1, 1]) {
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.083, 10, 10), skinMat);
+    hand.position.set(side * 0.265, 0.00, -0.04);
+    group.add(hand);
+  }
+
+  // ── 短い脚 ───────────────────────────────────────────────────
+  for (const side of [-1, 1]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.13, 0.075), blackMat);
+    leg.position.set(side * 0.090, -0.155, 0.0);
+    leg.castShadow = true;
+    group.add(leg);
+  }
+
+  // ── 大きな丸い靴 ─────────────────────────────────────────────
+  for (const side of [-1, 1]) {
+    const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.083, 10, 8), blackMat);
+    shoe.position.set(side * 0.090, -0.295, -0.032);
+    shoe.scale.set(1.10, 0.54, 1.42);
+    shoe.castShadow = true;
+    group.add(shoe);
+  }
 
   return group;
 }

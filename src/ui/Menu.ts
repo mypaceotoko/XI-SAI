@@ -184,6 +184,33 @@ export class Menu {
           0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(255,100,0,0.6); }
           50%       { transform: scale(1.08); box-shadow: 0 0 14px rgba(255,150,0,0.9); }
         }
+        .char-badge-hidden {
+          position: absolute;
+          top: -6px; right: -6px;
+          background: linear-gradient(135deg, #aa44ff, #6600cc);
+          color: #fff;
+          font-size: 9px;
+          font-weight: 900;
+          padding: 2px 6px;
+          border-radius: 8px;
+          box-shadow: 0 0 8px rgba(150,50,255,0.65);
+          animation: hidden-pulse 2s ease-in-out infinite;
+          pointer-events: none;
+        }
+        @keyframes hidden-pulse {
+          0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(150,50,255,0.65); }
+          50%       { transform: scale(1.08); box-shadow: 0 0 16px rgba(180,80,255,0.95); }
+        }
+        @keyframes unlock-flash {
+          0%   { opacity: 1; transform: scale(1.0); }
+          40%  { opacity: 0.9; transform: scale(1.02); }
+          100% { opacity: 0; transform: scale(1.0); }
+        }
+        #secret-tap {
+          cursor: default;
+          user-select: none;
+          -webkit-tap-highlight-color: transparent;
+        }
 
         /* クリア時タイトル */
         .menu-title-clear {
@@ -300,12 +327,20 @@ export class Menu {
     previews: Record<CharacterId, string>,
     onConfirm: (id: CharacterId) => void,
     onBack?: () => void,
+    isHiddenUnlocked = false,
+    onUnlockHidden?: () => void,
   ): void {
     let selected: CharacterId = currentId;
 
-    const cardHtml = CHARACTER_LIST.map(c => `
+    // 通常キャラ + 解放済み隠しキャラのみ表示
+    const visibleChars = CHARACTER_LIST.filter(c => !c.isHidden || isHiddenUnlocked);
+    const cols = visibleChars.length > 4 ? 3 : 4;
+    const maxW = cols === 3 ? 320 : 440;
+
+    const cardHtml = visibleChars.map(c => `
       <div class="char-card${c.id === currentId ? ' selected' : ''}" data-charid="${c.id}" id="char-${c.id}">
-        ${c.isNew ? '<div class="char-badge-new">NEW</div>' : ''}
+        ${c.isNew    ? '<div class="char-badge-new">NEW</div>' : ''}
+        ${c.isHidden ? '<div class="char-badge-hidden">SECRET</div>' : ''}
         <img class="char-preview" src="${previews[c.id]}" alt="${c.name}">
         <div class="char-name">${c.name}</div>
         <div class="char-desc">${c.description}</div>
@@ -313,13 +348,43 @@ export class Menu {
     `).join('');
 
     this.content().innerHTML = `
-      <div class="menu-title" style="font-size:28px;margin-bottom:14px;">キャラクター選択</div>
-      <div class="char-grid">${cardHtml}</div>
+      <div class="menu-title" style="font-size:28px;margin-bottom:14px;">キャラクター<span id="secret-tap">選択</span></div>
+      <div class="char-grid" style="grid-template-columns:repeat(${cols},1fr);max-width:${maxW}px">${cardHtml}</div>
       <button class="menu-btn" id="btn-confirm-char" style="font-size:15px;padding:11px 26px;">
         このキャラでプレイ ▶
       </button>
       ${onBack ? '<button class="menu-btn" id="btn-back" style="background:rgba(60,60,60,0.7);font-size:13px;padding:8px 18px;">← BACK</button>' : ''}
     `;
+
+    // 隠しキャラ解放の秘密タップ（「選択」を5回タップ）
+    if (!isHiddenUnlocked && onUnlockHidden) {
+      let tapCount = 0;
+      let tapTimer: number | null = null;
+
+      const secretEl = this.container.querySelector('#secret-tap')!;
+      const handleTap = () => {
+        tapCount++;
+        if (tapTimer !== null) clearTimeout(tapTimer);
+        if (tapCount >= 5) {
+          tapCount = 0;
+          // フラッシュ演出
+          const flash = document.createElement('div');
+          flash.style.cssText = [
+            'position:absolute', 'inset:0',
+            'background:rgba(140,40,255,0.45)',
+            'z-index:200', 'pointer-events:none',
+            'animation:unlock-flash 0.7s ease forwards',
+          ].join(';');
+          this.container.appendChild(flash);
+          setTimeout(() => flash.remove(), 700);
+          setTimeout(() => onUnlockHidden(), 300);
+          return;
+        }
+        tapTimer = window.setTimeout(() => { tapCount = 0; }, 2000);
+      };
+      secretEl.addEventListener('touchend', (e) => { e.preventDefault(); handleTap(); }, { passive: false } as EventListenerOptions);
+      secretEl.addEventListener('click', handleTap);
+    }
 
     // カード選択
     this.container.querySelectorAll('.char-card').forEach(card => {
