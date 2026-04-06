@@ -29,11 +29,14 @@ export class HUD {
           pointer-events: none;
           z-index: 10;
           padding: 6px 8px;
+          /* 右上ボタン群（BGM/SE/Zoom 約130px）と重ならないよう余白 */
+          padding-right: 132px;
+          box-sizing: border-box;
         }
         .hud-bar {
           display: flex;
           gap: 6px;
-          flex-wrap: nowrap;
+          flex-wrap: wrap;
           justify-content: flex-start;
           align-items: center;
         }
@@ -116,7 +119,7 @@ export class HUD {
 
         /* スマホ縦画面 */
         @media (max-width: 600px) {
-          #hud { padding: 4px 6px; }
+          #hud { padding: 4px 6px; padding-right: 120px; }
           .hud-bar { gap: 4px; }
           .hud-stat { padding: 2px 6px; border-radius: 4px; gap: 4px; }
           .hud-label { font-size: 8px; }
