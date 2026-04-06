@@ -1,5 +1,8 @@
 // ゲーム全体の型定義
 
+/** ゲームモード */
+export type GameMode = 'endless' | 'timeattack' | 'combo';
+
 /** グリッド座標 */
 export interface GridPos {
   x: number;

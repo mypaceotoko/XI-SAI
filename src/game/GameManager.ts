@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BoardConfig, Direction, ClearGroup } from '@/types';
+import { BoardConfig, Direction, ClearGroup, GameMode } from '@/types';
 import { Board } from '@/board/Board';
 import { BoardRenderer } from '@/board/BoardRenderer';
 import { Player } from '@/player/Player';
@@ -17,8 +17,21 @@ import { resetDiceIdCounter } from '@/dice/Dice';
 const BOARD_CONFIG: BoardConfig = {
   width: 8,
   depth: 8,
-  initialEmptyCount: 6,     // 最初の空きマス数
-  newDiceInterval: 360,      // 約6秒ごと(60fpsで)
+  initialEmptyCount: 6,
+  newDiceInterval: 360,
+};
+
+/** タイムアタックの制限時間（秒） */
+const TIME_ATTACK_SECONDS = 60;
+
+/** コンボチャレンジのターゲットチェーン数 */
+const COMBO_TARGET = 10;
+
+/** ハイスコアの localStorage キー */
+const HS_KEY: Record<GameMode, string> = {
+  endless:    'xi_sai_hs_endless',
+  timeattack: 'xi_sai_hs_timeattack',
+  combo:      'xi_sai_hs_combo',
 };
 
 /**
@@ -54,6 +67,8 @@ export class GameManager {
   private appEl: HTMLElement;
   private animationId = 0;
   private zoomBtnEl!: HTMLElement;
+  private bgmBtnEl!: HTMLElement;
+  private seBtnEl!: HTMLElement;
 
   // ズームレベル: 0=遠景(全体), 1=近景(寄り)
   private zoomLevel = 0;
@@ -61,6 +76,19 @@ export class GameManager {
   // 消去後のチェック遅延
   private pendingClearCheck = false;
   private clearCheckDelay = 0;
+
+  // ── ゲームモード関連 ──────────────────────────────────────────
+
+  private currentMode: GameMode = 'endless';
+
+  /** タイムアタック: 残り時間（ms） */
+  private timeRemaining = 0;
+  private lastFrameTime = 0;
+
+  /** BGM: 最初のユーザー操作後に一度だけ開始 */
+  private bgmStarted = false;
+
+  // ─────────────────────────────────────────────────────────────
 
   constructor(appEl: HTMLElement) {
     this.appEl = appEl;
@@ -72,25 +100,22 @@ export class GameManager {
     this.initThree();
     this.initUI();
     this.initInput();
+    this.initBGMUnlock();
 
     // タイトル画面表示
     this.menu.showTitle();
 
-    // 背景だけ描画するループ
     this.startRenderLoop();
   }
 
-  /**
-   * スマホ縦画面では仮想パッド分の高さを引いてキャンバスサイズを計算する。
-   * 横画面・PCはフル画面。
-   */
+  // ── 初期化 ──────────────────────────────────────────────────
+
   private getCanvasSize(): { w: number; h: number } {
     const isPortrait = window.innerWidth < window.innerHeight && window.innerWidth <= 768;
-    const padReserve = isPortrait ? 240 : 0; // virtual pad 高さ分の余白（70px×3 + gap + bottom）
+    const padReserve = isPortrait ? 240 : 0;
     return { w: window.innerWidth, h: window.innerHeight - padReserve };
   }
 
-  /** Three.js 初期化 */
   private initThree(): void {
     let lastTouchStart = 0;
     const { w, h } = this.getCanvasSize();
@@ -102,24 +127,16 @@ export class GameManager {
     this.renderer.setClearColor(0x080810);
     this.appEl.appendChild(this.renderer.domElement);
 
-    // canvas へのタッチで合成マウスイベントが生成されるのを防ぐ
     const canvas = this.renderer.domElement;
     canvas.addEventListener('touchstart', (e: TouchEvent) => e.preventDefault(), { passive: false });
-    canvas.addEventListener('touchend', (e: TouchEvent) => e.preventDefault(), { passive: false });
+    canvas.addEventListener('touchend',   (e: TouchEvent) => e.preventDefault(), { passive: false });
 
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0x080810, 0.04);
 
-    // カメラ（XIのような斜め見下ろしアングル）
-    this.camera = new THREE.PerspectiveCamera(
-      40,
-      w / h,
-      0.1,
-      100,
-    );
+    this.camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
     this.updateCameraPosition();
 
-    // ライティング
     const ambientLight = new THREE.AmbientLight(0x8899aa, 2.2);
     this.scene.add(ambientLight);
 
@@ -127,39 +144,28 @@ export class GameManager {
     dirLight.position.set(8, 12, 6);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.set(2048, 2048);
-    dirLight.shadow.camera.left = -12;
-    dirLight.shadow.camera.right = 12;
-    dirLight.shadow.camera.top = 12;
+    dirLight.shadow.camera.left   = -12;
+    dirLight.shadow.camera.right  =  12;
+    dirLight.shadow.camera.top    =  12;
     dirLight.shadow.camera.bottom = -12;
     this.scene.add(dirLight);
 
-    // バックライト
     const backLight = new THREE.DirectionalLight(0x6699cc, 0.9);
     backLight.position.set(-5, 8, -5);
     this.scene.add(backLight);
 
-    // リサイズ対応
     window.addEventListener('resize', () => this.onResize());
 
-    // ===== モバイルのピンチズームを防止 =====
+    // ピンチ・ダブルタップズーム防止
     const prevent = (e: Event) => e.preventDefault();
-
-    // Safari iOS: ジェスチャーイベント
     document.addEventListener('gesturestart',  prevent, { passive: false });
     document.addEventListener('gesturechange', prevent, { passive: false });
-    document.addEventListener('gestureend',   prevent, { passive: false });
+    document.addEventListener('gestureend',    prevent, { passive: false });
 
-    // 全ブラウザ: 2本指タッチ & ダブルタップズームを touchstart で阻止
-    // touchstart で preventDefault する方が iOS では確実（touchend より先に評価される）
     document.addEventListener('touchstart', (e: TouchEvent) => {
-      if (e.touches.length > 1) {
-        e.preventDefault(); // ピンチズーム阻止
-        return;
-      }
+      if (e.touches.length > 1) { e.preventDefault(); return; }
       const now = Date.now();
-      if (now - lastTouchStart < 300) {
-        e.preventDefault(); // ダブルタップズーム阻止
-      }
+      if (now - lastTouchStart < 300) e.preventDefault();
       lastTouchStart = now;
     }, { passive: false });
     document.addEventListener('touchmove', (e: TouchEvent) => {
@@ -173,15 +179,13 @@ export class GameManager {
     const isPortrait = window.innerWidth < window.innerHeight && window.innerWidth <= 768;
 
     if (this.zoomLevel === 1) {
-      // 近景: ズームイン
       this.camera.fov = isPortrait ? 38 : 30;
       this.camera.position.set(cx + 4, 9, cz + 8);
     } else {
-      // 遠景: ボード全体
       this.camera.fov = isPortrait ? 52 : 40;
       this.camera.position.set(
         isPortrait ? cx + 5 : cx + 6,
-        isPortrait ? 14 : 11,
+        isPortrait ? 14     : 11,
         isPortrait ? cz + 12 : cz + 10,
       );
     }
@@ -191,69 +195,120 @@ export class GameManager {
 
   /** UI初期化 */
   private initUI(): void {
-    this.hud = new HUD(this.appEl);
+    this.hud  = new HUD(this.appEl);
     this.menu = new Menu(this.appEl);
     this.virtualPad = new VirtualPad(this.appEl);
 
     this.menu.setCallbacks(
-      () => this.startGame(),
+      (mode: GameMode) => this.startGame(mode),
       () => this.restartGame(),
       () => this.resumeGame(),
+      () => this.loadHighScores(),
     );
 
-    this.initZoomButton();
+    this.initTopButtons();
   }
 
-  /** ズームトグルボタン */
-  private initZoomButton(): void {
-    this.zoomBtnEl = document.createElement('button');
-    this.zoomBtnEl.id = 'zoom-btn';
-    this.zoomBtnEl.textContent = '🔍+';
-    this.zoomBtnEl.setAttribute('aria-label', 'ズーム切替');
-
+  /** 右上のボタン群（ズーム・BGM・SE） */
+  private initTopButtons(): void {
     const style = document.createElement('style');
     style.textContent = `
-      #zoom-btn {
+      #top-btns {
         position: absolute;
         top: 6px;
         right: 8px;
         z-index: 20;
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .top-btn {
         background: rgba(0,0,0,0.45);
         border: 1px solid rgba(255,255,255,0.2);
         border-radius: 8px;
         color: #fff;
-        font-size: 14px;
-        padding: 4px 10px;
+        font-size: 13px;
+        padding: 4px 9px;
         cursor: pointer;
         touch-action: none;
         -webkit-tap-highlight-color: transparent;
         user-select: none;
+        line-height: 1.4;
       }
-      #zoom-btn:active { background: rgba(0,170,119,0.4); }
+      .top-btn:active { background: rgba(0,170,119,0.4); }
     `;
     this.appEl.appendChild(style);
-    this.appEl.appendChild(this.zoomBtnEl);
 
-    /** ブラウザのビューポートズームをリセットする */
+    const wrap = document.createElement('div');
+    wrap.id = 'top-btns';
+
+    this.bgmBtnEl = document.createElement('button');
+    this.bgmBtnEl.className = 'top-btn';
+    this.bgmBtnEl.textContent = '🎵';
+    this.bgmBtnEl.setAttribute('aria-label', 'BGM ON/OFF');
+
+    this.seBtnEl = document.createElement('button');
+    this.seBtnEl.className = 'top-btn';
+    this.seBtnEl.textContent = '🔊';
+    this.seBtnEl.setAttribute('aria-label', 'SE ON/OFF');
+
+    this.zoomBtnEl = document.createElement('button');
+    this.zoomBtnEl.className = 'top-btn';
+    this.zoomBtnEl.id = 'zoom-btn';
+    this.zoomBtnEl.textContent = '🔍+';
+    this.zoomBtnEl.setAttribute('aria-label', 'ズーム切替');
+
+    wrap.appendChild(this.bgmBtnEl);
+    wrap.appendChild(this.seBtnEl);
+    wrap.appendChild(this.zoomBtnEl);
+    this.appEl.appendChild(wrap);
+
+    // BGM ボタン
+    const toggleBGM = () => {
+      const muted = this.audioManager.toggleBGMMute();
+      this.bgmBtnEl.textContent = muted ? '🔇' : '🎵';
+    };
+    this.bgmBtnEl.addEventListener('touchend', (e) => { e.preventDefault(); toggleBGM(); }, { passive: false });
+    this.bgmBtnEl.addEventListener('click', toggleBGM);
+
+    // SE ボタン
+    const toggleSE = () => {
+      const muted = this.audioManager.toggleSEMute();
+      this.seBtnEl.textContent = muted ? '🔕' : '🔊';
+    };
+    this.seBtnEl.addEventListener('touchend', (e) => { e.preventDefault(); toggleSE(); }, { passive: false });
+    this.seBtnEl.addEventListener('click', toggleSE);
+
+    // ズームボタン
     const resetBrowserZoom = () => {
       const meta = document.querySelector('meta[name="viewport"]') as HTMLMetaElement | null;
       if (!meta) return;
-      // 一瞬 user-scalable=yes を許可してから initial-scale=1 を再通知することで
-      // iOS Safari でもスケールをリセットできる場合がある
       meta.content = 'width=device-width, initial-scale=1, maximum-scale=2, user-scalable=yes';
       requestAnimationFrame(() => {
         meta.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no';
       });
     };
-
-    const toggle = () => {
+    const toggleZoom = () => {
       this.zoomLevel = this.zoomLevel === 0 ? 1 : 0;
       this.zoomBtnEl.textContent = this.zoomLevel === 1 ? '🔍−' : '🔍+';
       this.updateCameraPosition();
-      resetBrowserZoom(); // カメラ切替と同時にブラウザズームもリセット
+      resetBrowserZoom();
     };
-    this.zoomBtnEl.addEventListener('touchend', (e) => { e.preventDefault(); toggle(); }, { passive: false });
-    this.zoomBtnEl.addEventListener('click', toggle);
+    this.zoomBtnEl.addEventListener('touchend', (e) => { e.preventDefault(); toggleZoom(); }, { passive: false });
+    this.zoomBtnEl.addEventListener('click', toggleZoom);
+  }
+
+  /** 最初のユーザー操作で BGM を開始（iOS autoplay 対策） */
+  private initBGMUnlock(): void {
+    const unlock = () => {
+      this.audioManager.resumeContext();
+      if (!this.bgmStarted) {
+        this.bgmStarted = true;
+        this.audioManager.startBGM();
+      }
+    };
+    document.addEventListener('touchstart', unlock, { once: true });
+    document.addEventListener('click',      unlock, { once: true });
   }
 
   /** 入力初期化 */
@@ -271,7 +326,8 @@ export class GameManager {
     });
   }
 
-  /** 入力処理 */
+  // ── 入力処理 ───────────────────────────────────────────────
+
   private handleInput(action: InputAction): void {
     switch (action.type) {
       case 'move':
@@ -282,9 +338,7 @@ export class GameManager {
       case 'descend':
         if (!this.gameState.canPlayerAct()) return;
         if (!this.player || !this.player.isIdle()) return;
-        if (this.player.descend()) {
-          this.audioManager.playMove();
-        }
+        if (this.player.descend()) this.audioManager.playMove();
         break;
       case 'restart':
         if (this.gameState.isPlaying() || this.gameState.phase === 'gameover') {
@@ -301,108 +355,109 @@ export class GameManager {
     }
   }
 
-  /** 移動処理 */
   private handleMove(direction: Direction): void {
     const moveType = this.player.move(direction);
+    if (!moveType) return;
 
-    if (moveType) {
-      switch (moveType) {
-        case 'ride_roll':
-          this.audioManager.playPush();
-          // 転がしたサイコロのテクスチャ更新
-          if (this.player.data.ridingDiceId !== null) {
-            const dice = this.board.getDiceById(this.player.data.ridingDiceId);
-            if (dice) {
-              this.boardRenderer.refreshDiceMaterial(dice);
-            }
-          }
-          // 転がした後に消去チェックを予約
-          this.pendingClearCheck = true;
-          this.clearCheckDelay = 10;
-          break;
-        case 'climb':
-        case 'descend':
-          this.audioManager.playMove();
-          break;
-        case 'walk':
-          this.audioManager.playMove();
-          break;
-      }
+    switch (moveType) {
+      case 'ride_roll':
+        this.audioManager.playPush();
+        if (this.player.data.ridingDiceId !== null) {
+          const dice = this.board.getDiceById(this.player.data.ridingDiceId);
+          if (dice) this.boardRenderer.refreshDiceMaterial(dice);
+        }
+        this.pendingClearCheck = true;
+        this.clearCheckDelay = 10;
+        break;
+      case 'climb':
+      case 'descend':
+      case 'walk':
+        this.audioManager.playMove();
+        break;
     }
   }
 
-  /** ゲーム開始 */
-  private startGame(): void {
-    this.cleanup(); // 重複レンダラー防止（多重呼び出し対策）
-    this.menu.hide();
-    this.initGameObjects();
-    this.gameState.transition('playing');
-  }
+  // ── ゲーム状態遷移 ─────────────────────────────────────────
 
-  /** ゲームリスタート */
-  private restartGame(): void {
-    this.menu.hide();
+  private startGame(mode: GameMode): void {
+    this.currentMode = mode;
     this.cleanup();
+    this.menu.hide();
     this.initGameObjects();
+    this.initModeState();
     this.gameState.transition('playing');
   }
 
-  /** ポーズ */
+  private restartGame(): void {
+    this.cleanup();
+    this.menu.hide();
+    this.initGameObjects();
+    this.initModeState();
+    this.gameState.transition('playing');
+  }
+
+  /** モード固有の初期化 */
+  private initModeState(): void {
+    this.hud.showMode(this.currentMode);
+
+    if (this.currentMode === 'timeattack') {
+      this.timeRemaining = TIME_ATTACK_SECONDS * 1000;
+      this.lastFrameTime = performance.now();
+      this.hud.showTimer(TIME_ATTACK_SECONDS, TIME_ATTACK_SECONDS);
+    } else {
+      this.hud.hideTimer();
+    }
+  }
+
   private pauseGame(): void {
     this.gameState.transition('paused');
     this.menu.showPause();
   }
 
-  /** 再開 */
   private resumeGame(): void {
     this.menu.hide();
+    if (this.currentMode === 'timeattack') {
+      this.lastFrameTime = performance.now(); // 再開時刻リセット（ポーズ中の経過をカウントしない）
+    }
     this.gameState.transition('playing');
   }
 
-  /** ゲームオブジェクト初期化 */
+  // ── ゲームオブジェクト初期化 ─────────────────────────────
+
   private initGameObjects(): void {
     resetDiceIdCounter();
     this.happyOneTracker.clear();
     this.pendingClearCheck = false;
 
-    // ボード作成（サイコロで埋まった盤面）
     this.board = new Board(BOARD_CONFIG);
     const emptyPositions = this.board.init();
 
-    // プレイヤーを空きマスの中央寄りに配置
     const cx = Math.floor(BOARD_CONFIG.width / 2);
     const cz = Math.floor(BOARD_CONFIG.depth / 2);
     let startPos = emptyPositions[0] || { x: cx, z: cz };
-
-    // 中央に最も近い空きマスを選ぶ
     let bestDist = Infinity;
     for (const pos of emptyPositions) {
       const dist = Math.abs(pos.x - cx) + Math.abs(pos.z - cz);
-      if (dist < bestDist) {
-        bestDist = dist;
-        startPos = pos;
-      }
+      if (dist < bestDist) { bestDist = dist; startPos = pos; }
     }
 
     this.player = new Player(this.board, startPos);
 
-    // チェーンマネージャー
     this.chainManager = new ChainManager(this.board);
     this.chainManager.setCallbacks(
       (groups: ClearGroup[]) => this.onClearStart(groups),
-      (chainCount: number) => this.onChain(chainCount),
+      (chainCount: number)   => this.onChain(chainCount),
     );
 
-    // レンダラー
     this.boardRenderer = new BoardRenderer(this.scene, this.board);
     this.boardRenderer.init();
     this.playerRenderer = new PlayerRenderer(this.scene);
 
-    // HUD初期化
     this.hud.updateScore(this.chainManager.score);
   }
 
-  /** 消去開始コールバック */
+  // ── コールバック ──────────────────────────────────────────
+
   private onClearStart(groups: ClearGroup[]): void {
     let hasHappyOne = false;
     for (const g of groups) {
@@ -410,28 +465,39 @@ export class GameManager {
         hasHappyOne = true;
         for (const id of g.diceIds) {
           const dice = this.board.getDiceById(id);
-          if (dice) {
-            this.happyOneTracker.addEvent(id, dice.pos.x, dice.pos.z);
-          }
+          if (dice) this.happyOneTracker.addEvent(id, dice.pos.x, dice.pos.z);
         }
       }
     }
 
     if (hasHappyOne) {
-      this.hud.showNotification('HAPPY ONE!', true);
+      this.hud.showNotification('HAPPY ONE!');
       this.audioManager.playHappyOne();
     } else {
       this.audioManager.playClear(this.chainManager.score.chainCount);
     }
+
+    // コンボ数が多いときは大きく表示
+    const combo = this.chainManager.score.combo;
+    if (combo >= 3) {
+      setTimeout(() => {
+        this.hud.showNotification(`${combo} COMBO!`, true);
+      }, 300);
+    }
   }
 
-  /** 連鎖コールバック */
   private onChain(chainCount: number): void {
-    this.hud.showNotification(`${chainCount} CHAIN!`);
+    this.hud.showNotification(`${chainCount} CHAIN!`, chainCount >= 3);
     this.audioManager.playCombo(chainCount);
+
+    // コンボチャレンジ: ターゲット達成チェック
+    if (this.currentMode === 'combo' && chainCount >= COMBO_TARGET) {
+      this.gameClear();
+    }
   }
 
-  /** 描画ループ（常時動作） */
+  // ── 描画・更新ループ ──────────────────────────────────────
+
   private startRenderLoop(): void {
     const loop = () => {
       this.animationId = requestAnimationFrame(loop);
@@ -441,103 +507,148 @@ export class GameManager {
     loop();
   }
 
-  /** フレーム更新 */
   private update(): void {
     if (this.gameState.phase === 'paused') return;
     if (!this.gameState.isPlaying()) return;
     if (!this.board || !this.player) return;
 
-    // プレイヤー更新
-    this.player.update();
+    // ── タイムアタック タイマー ────────────────────────────
+    if (this.currentMode === 'timeattack') {
+      const now = performance.now();
+      const delta = now - this.lastFrameTime;
+      this.lastFrameTime = now;
+      this.timeRemaining -= delta;
 
-    // ボード更新（新サイコロ追加など）
-    const newDice = this.board.update(this.player.data.pos);
-    if (newDice) {
-      this.boardRenderer.addDiceMesh(newDice);
+      const secLeft = Math.max(0, this.timeRemaining / 1000);
+      this.hud.showTimer(secLeft, TIME_ATTACK_SECONDS);
+
+      if (this.timeRemaining <= 0) {
+        this.gameOver(); // 時間切れ
+        return;
+      }
     }
 
-    // 消去チェック遅延処理
+    // ── プレイヤー更新 ─────────────────────────────────────
+    this.player.update();
+
+    // ── ボード更新（新サイコロ追加） ───────────────────────
+    const newDice = this.board.update(this.player.data.pos);
+    if (newDice) this.boardRenderer.addDiceMesh(newDice);
+
+    // ── 消去チェック遅延 ───────────────────────────────────
     if (this.pendingClearCheck && this.player.isIdle()) {
       this.clearCheckDelay--;
       if (this.clearCheckDelay <= 0) {
         this.pendingClearCheck = false;
         const started = this.chainManager.checkAndStartClearing();
-        if (started) {
-          this.gameState.transition('clearing');
+        if (started) this.gameState.transition('clearing');
+      }
+    }
+
+    // ── 消去アニメーション ─────────────────────────────────
+    if (this.chainManager.getIsClearing()) {
+      const stillClearing = this.chainManager.update();
+      if (!stillClearing) {
+        this.boardRenderer.syncAllDice();
+        this.player.syncRidingState();
+        this.gameState.transition('playing');
+
+        // ゲームクリア判定: 全サイコロが消えた
+        if (this.isBoardEmpty()) {
+          this.gameClear();
+          return;
         }
       }
     }
 
-    // 消去アニメーション処理
-    if (this.chainManager.getIsClearing()) {
-      const stillClearing = this.chainManager.update();
-      if (!stillClearing) {
-        // 消去完了 → Meshを同期
-        this.boardRenderer.syncAllDice();
-        // プレイヤーの乗り状態を再チェック（乗っていたサイコロが消えた場合）
-        this.player.syncRidingState();
-        this.gameState.transition('playing');
-      }
-    }
-
-    // スコア更新
+    // ── スコア更新 ─────────────────────────────────────────
     this.hud.updateScore(this.chainManager.score);
 
-    // ゲームオーバーチェック
+    // ── ゲームオーバー判定 ─────────────────────────────────
     if (!this.chainManager.getIsClearing() && this.board.isGameOver(this.player.data.pos)) {
-      // プレイヤーが動けるか最終チェック
       if (this.isPlayerStuck()) {
         this.gameOver();
+        return;
       }
     }
 
-    // 描画更新
+    // ── 描画更新 ───────────────────────────────────────────
     this.boardRenderer.update();
     this.playerRenderer.update(this.player.data);
   }
 
-  /** プレイヤーが完全に動けないかチェック */
-  private isPlayerStuck(): boolean {
-    const pos = this.player.data.pos;
-    const directions: Direction[] = ['north', 'south', 'east', 'west'];
+  // ── 終了処理 ──────────────────────────────────────────────
 
-    for (const dir of directions) {
-      const dv = { north: { x: 0, z: -1 }, south: { x: 0, z: 1 }, east: { x: 1, z: 0 }, west: { x: -1, z: 0 } }[dir];
-      const targetPos = { x: pos.x + dv.x, z: pos.z + dv.z };
-
-      if (!this.board.isInBounds(targetPos)) continue;
-
-      const diceAtTarget = this.board.getDiceAt(targetPos);
-
-      if (!diceAtTarget) {
-        // 空きマスがある→移動可能
-        return false;
-      }
-
-      if (this.player.data.level === 'on_dice' || this.player.data.level === 'ground') {
-        // サイコロの上にいる場合: 隣のサイコロに乗り移れる
-        // または隣のサイコロを転がせるか（さらにその先が空き）
-        if (this.player.data.level === 'on_dice' && this.player.data.ridingDiceId !== null) {
-          // 乗っているサイコロの先が空いていれば転がせる
-          // ただし乗り移りは常にOK
-          return false; // 隣にサイコロがあれば乗り移れる
-        }
-        return false; // 地面からサイコロに登れる
-      }
-    }
-
-    return true; // どの方向にも移動できない
+  /** 全サイコロ（clearing含む）が盤面から消えたか */
+  private isBoardEmpty(): boolean {
+    return this.board.getAllDice().length === 0;
   }
 
-  /** ゲームオーバー */
+  private isPlayerStuck(): boolean {
+    const pos = this.player.data.pos;
+    const dirs: Direction[] = ['north', 'south', 'east', 'west'];
+    const dv: Record<Direction, { x: number; z: number }> = {
+      north: { x: 0, z: -1 }, south: { x: 0, z: 1 },
+      east:  { x: 1, z: 0 },  west:  { x: -1, z: 0 },
+    };
+    for (const dir of dirs) {
+      const tp = { x: pos.x + dv[dir].x, z: pos.z + dv[dir].z };
+      if (!this.board.isInBounds(tp)) continue;
+      const dice = this.board.getDiceAt(tp);
+      if (!dice || dice.clearing) return false;
+      if (this.player.data.level === 'on_dice' && this.player.data.ridingDiceId !== null) return false;
+      return false; // 地面からサイコロに登れる
+    }
+    return true;
+  }
+
   private gameOver(): void {
     this.gameState.transition('gameover');
     this.audioManager.playGameOver();
     const { score, maxCombo, totalCleared } = this.chainManager.score;
-    this.menu.showGameOver(score, maxCombo, totalCleared);
+    const isHS = this.saveHighScore(score);
+    this.menu.showGameOver(score, maxCombo, totalCleared, isHS);
   }
 
-  /** リサイズ処理 */
+  private gameClear(): void {
+    this.gameState.transition('gameover');
+    this.audioManager.playGameClear();
+    const { score, maxCombo, totalCleared } = this.chainManager.score;
+    const isHS = this.saveHighScore(score);
+    this.menu.showGameClear(score, maxCombo, totalCleared, isHS);
+  }
+
+  // ── ハイスコア ────────────────────────────────────────────
+
+  private loadHighScores() {
+    const load = (key: string) => parseInt(localStorage.getItem(key) ?? '0', 10);
+    return {
+      endless:    load(HS_KEY.endless),
+      timeattack: load(HS_KEY.timeattack),
+      combo:      load(HS_KEY.combo),
+    };
+  }
+
+  /** スコアを保存し、新記録なら true を返す */
+  private saveHighScore(score: number): boolean {
+    const key = HS_KEY[this.currentMode];
+    const prev = parseInt(localStorage.getItem(key) ?? '0', 10);
+    if (score > prev) {
+      localStorage.setItem(key, score.toString());
+      return true;
+    }
+    return false;
+  }
+
+  // ── モード選択画面へのハイスコア連携 ──────────────────────
+
+  /** Menu.showModeSelect にハイスコアを渡すよう onStart コールバック前に呼ぶ */
+  private showModeSelectWithScores(): void {
+    this.menu.showModeSelect(this.loadHighScores());
+  }
+
+  // ── リサイズ ──────────────────────────────────────────────
+
   private onResize(): void {
     const { w, h } = this.getCanvasSize();
     this.camera.aspect = w / h;
@@ -546,7 +657,6 @@ export class GameManager {
     this.updateCameraPosition();
   }
 
-  /** クリーンアップ */
   private cleanup(): void {
     if (this.boardRenderer) this.boardRenderer.dispose();
     if (this.playerRenderer) this.playerRenderer.dispose();
