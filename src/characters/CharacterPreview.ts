@@ -198,123 +198,218 @@ function drawTank(): string {
   return ctx.canvas.toDataURL();
 }
 
-// ── バードレイザー ────────────────────────────────────────────────
+// ── バードレイザー（左向きプロファイル） ─────────────────────────
 
 function drawBird(): string {
   const ctx = makeCtx(); // 128 × 128
-  const W = S, H = S;
 
-  // 尾羽（最背面、長いカール）
-  ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineWidth = 7;
-  ctx.strokeStyle = '#22bb55';
+  // ─── 尾羽（最背面、右下へ長くカール） ───────────────────────
+  // 参照画像: 尾は体の右下から始まり大きくS字を描く
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  // 最外層（暗緑・極太）
+  ctx.strokeStyle = '#0d6630'; ctx.lineWidth = 16;
   ctx.beginPath();
-  ctx.moveTo(68, 92);
-  ctx.bezierCurveTo(40, 108, 18, 118, 22, 128);
+  ctx.moveTo(96, 82);
+  ctx.bezierCurveTo(104, 100, 110, 118, 98, 128);
   ctx.stroke();
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = '#55ee88';
+
+  // 中層（鮮やか緑）
+  ctx.strokeStyle = '#22bb44'; ctx.lineWidth = 11;
   ctx.beginPath();
-  ctx.moveTo(72, 94);
-  ctx.bezierCurveTo(48, 112, 26, 120, 30, 128);
+  ctx.moveTo(97, 82);
+  ctx.bezierCurveTo(106, 102, 112, 120, 100, 128);
   ctx.stroke();
-  ctx.restore();
 
-  // 翼（青紫）
-  const wingGrad = ctx.createLinearGradient(74, 58, 112, 98);
-  wingGrad.addColorStop(0, '#5566ee');
-  wingGrad.addColorStop(1, '#1122aa');
-  ctx.fillStyle = wingGrad;
+  // 内層（明るい緑）
+  ctx.strokeStyle = '#44dd66'; ctx.lineWidth = 6;
   ctx.beginPath();
-  ctx.moveTo(74, 62);
-  ctx.bezierCurveTo(100, 56, 118, 72, 112, 100);
-  ctx.bezierCurveTo(104, 114, 82, 112, 70, 100);
-  ctx.closePath();
+  ctx.moveTo(98, 83);
+  ctx.bezierCurveTo(108, 104, 114, 122, 102, 128);
+  ctx.stroke();
+
+  // 黄緑アクセント
+  ctx.strokeStyle = '#99ff44'; ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(99, 84);
+  ctx.bezierCurveTo(110, 106, 116, 124, 104, 128);
+  ctx.stroke();
+
+  // ─── 翼（青〜紺グラデ、体の右後ろに広がる） ─────────────────
+  const wg = ctx.createLinearGradient(72, 50, 128, 92);
+  wg.addColorStop(0, '#7788ff');
+  wg.addColorStop(0.45, '#3355dd');
+  wg.addColorStop(1, '#0e1d88');
+  ctx.fillStyle = wg;
+  ctx.beginPath();
+  ctx.moveTo(73, 55);
+  ctx.bezierCurveTo(96, 46, 126, 54, 124, 84);
+  ctx.bezierCurveTo(120, 103, 94, 106, 76, 96);
+  ctx.bezierCurveTo(68, 87, 67, 68, 73, 55);
   ctx.fill();
 
-  // 体（ティール楕円）
-  const bodyGrad = ctx.createRadialGradient(60, 82, 4, 64, 84, 28);
-  bodyGrad.addColorStop(0, '#55ddcc');
-  bodyGrad.addColorStop(1, '#116655');
-  ctx.fillStyle = bodyGrad;
-  ctx.beginPath();
-  ctx.ellipse(63, 85, 24, 30, -0.1, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 胸（赤橙）
-  const chestGrad = ctx.createRadialGradient(56, 80, 1, 57, 82, 16);
-  chestGrad.addColorStop(0, '#ff8844');
-  chestGrad.addColorStop(1, 'rgba(150,40,20,0)');
-  ctx.fillStyle = chestGrad;
-  ctx.beginPath();
-  ctx.ellipse(56, 82, 15, 18, 0.2, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 足
-  ctx.strokeStyle = '#444455'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-  const claws: [number, number, number, number][] = [
-    [57, 108, 48, 120], [57, 108, 54, 122], [57, 108, 62, 120],
-    [70, 108, 65, 120], [70, 108, 72, 122], [70, 108, 78, 118],
-  ];
-  for (const [ax, ay, bx, by] of claws) {
-    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  // 翼の羽毛ライン
+  ctx.strokeStyle = 'rgba(90,110,230,0.55)'; ctx.lineWidth = 1;
+  for (let i = 0; i < 8; i++) {
+    const t = i / 7;
+    ctx.beginPath();
+    ctx.moveTo(74 + t * 44, 56 + t * 30);
+    ctx.lineTo(76 + t * 38, 94 + t * 10);
+    ctx.stroke();
   }
-
-  // 頭
-  const headGrad = ctx.createRadialGradient(58, 50, 3, 62, 54, 24);
-  headGrad.addColorStop(0, '#66eedd');
-  headGrad.addColorStop(1, '#116666');
-  ctx.fillStyle = headGrad;
-  ctx.beginPath();
-  ctx.ellipse(61, 55, 22, 24, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // ヘアクレスト（黒い逆立ち毛）
-  const crestPoints: [number, number, number, number, number, number][] = [
-    [66, 32, 78, 10, 82, 4],
-    [63, 31, 72, 8,  74, 2],
-    [60, 31, 64, 6,  64, 0],
-    [57, 33, 55, 8,  52, 4],
-  ];
-  ctx.lineCap = 'round';
-  for (let i = 0; i < crestPoints.length; i++) {
-    const [x1, y1, cx, cy, x2, y2] = crestPoints[i];
-    ctx.strokeStyle = i % 2 === 0 ? '#1a1a2a' : '#2a2a3e';
-    ctx.lineWidth = 3.5 - i * 0.4;
-    ctx.beginPath(); ctx.moveTo(x1, y1);
-    ctx.quadraticCurveTo(cx, cy, x2, y2);
+  // 翼端の暗い羽毛
+  ctx.strokeStyle = '#0a1060'; ctx.lineWidth = 2.2;
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.moveTo(116 + i * 1.5, 58 + i * 5);
+    ctx.lineTo(122 + i * 1, 70 + i * 6);
     ctx.stroke();
   }
 
-  // くちばし
-  ctx.fillStyle = '#aaaaaa';
+  // ─── 体（ティール、左向き卵型） ──────────────────────────────
+  const bodg = ctx.createRadialGradient(78, 70, 5, 80, 73, 28);
+  bodg.addColorStop(0, '#66ddd0');
+  bodg.addColorStop(0.5, '#229999');
+  bodg.addColorStop(1, '#0d5555');
+  ctx.fillStyle = bodg;
   ctx.beginPath();
-  ctx.moveTo(38, 58); ctx.lineTo(52, 54); ctx.lineTo(52, 60); ctx.lineTo(40, 62);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#888888';
-  ctx.beginPath();
-  ctx.moveTo(40, 62); ctx.lineTo(52, 60); ctx.lineTo(50, 66); ctx.lineTo(42, 68);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#551111';
-  ctx.beginPath();
-  ctx.moveTo(52, 54); ctx.lineTo(52, 66); ctx.lineTo(42, 70); ctx.lineTo(38, 62);
-  ctx.closePath(); ctx.fill();
+  ctx.ellipse(80, 74, 26, 30, -0.05, 0, Math.PI * 2);
+  ctx.fill();
 
-  // 黄色い目
-  ctx.fillStyle = '#223322';
-  ctx.beginPath(); ctx.arc(55, 50, 12, 0, Math.PI * 2); ctx.fill();
-  const eyeG = ctx.createRadialGradient(54, 49, 1, 55, 50, 10);
-  eyeG.addColorStop(0, '#ffff44');
-  eyeG.addColorStop(0.7, '#ddaa00');
-  eyeG.addColorStop(1, '#886600');
-  ctx.fillStyle = eyeG;
-  ctx.beginPath(); ctx.arc(55, 50, 10, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#0a0a0a';
-  ctx.beginPath(); ctx.arc(55, 51, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  ctx.beginPath(); ctx.arc(52, 47, 2, 0, Math.PI * 2); ctx.fill();
+  // ─── 胸（クリーム→錆赤、体の左前面） ────────────────────────
+  const chg = ctx.createLinearGradient(58, 54, 62, 88);
+  chg.addColorStop(0, '#e8e4d4');     // クリーム/白
+  chg.addColorStop(0.28, '#cc7755'); // 錆オレンジ
+  chg.addColorStop(0.65, '#aa4422'); // 錆赤
+  chg.addColorStop(1, 'rgba(120,40,20,0)');
+  ctx.fillStyle = chg;
+  ctx.beginPath();
+  ctx.ellipse(64, 72, 18, 24, -0.18, 0, Math.PI * 2);
+  ctx.fill();
 
-  void W; void H;
+  // ─── 足・爪（2本脚、湾曲した鋭い爪） ────────────────────────
+  ctx.strokeStyle = '#2e2e3e'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  // 前足（左に向いた爪）
+  const f1x = 64, f1y = 96;
+  for (const [tx, ty] of [[48,112],[55,116],[64,115],[72,110]] as [number,number][]) {
+    ctx.beginPath();
+    ctx.moveTo(f1x, f1y);
+    ctx.quadraticCurveTo(f1x + (tx-f1x)*0.4, f1y+8, tx, ty);
+    ctx.stroke();
+  }
+  // 後足（やや後ろ）
+  ctx.strokeStyle = '#3a3a4a'; ctx.lineWidth = 2.2;
+  const f2x = 76, f2y = 98;
+  for (const [tx, ty] of [[65,110],[74,116],[84,112],[90,106]] as [number,number][]) {
+    ctx.beginPath();
+    ctx.moveTo(f2x, f2y);
+    ctx.quadraticCurveTo(f2x+(tx-f2x)*0.4, f2y+6, tx, ty);
+    ctx.stroke();
+  }
+
+  // ─── 頭部（左向きプロファイル楕円） ─────────────────────────
+  const hdg = ctx.createRadialGradient(57, 36, 4, 61, 40, 24);
+  hdg.addColorStop(0, '#88eecc');
+  hdg.addColorStop(0.45, '#33aaaa');
+  hdg.addColorStop(1, '#0f5560');
+  ctx.fillStyle = hdg;
+  ctx.beginPath();
+  ctx.ellipse(61, 41, 23, 22, -0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ─── ヘアクレスト（黒い大きなポンパドール、右後ろへ流れる） ──
+  // 参照画像: 頭頂から右へ大きくうねる黒髪の束
+  ctx.lineCap = 'round';
+  const crests: [number,number,number,number,number,number,number][] = [
+    // [startX, startY, ctrlX, ctrlY, endX, endY, lineWidth]
+    [64, 22, 88,  4, 106,  3, 7.5],
+    [62, 23, 85,  8, 101,  7, 6.0],
+    [61, 25, 82, 12,  97, 12, 5.0],
+    [60, 27, 78, 16,  92, 17, 4.2],
+    [59, 29, 74, 20,  87, 22, 3.5],
+    [58, 31, 70, 24,  82, 27, 2.8],
+  ];
+  for (let i = 0; i < crests.length; i++) {
+    const [sx, sy, cx, cy, ex, ey, lw] = crests[i];
+    ctx.strokeStyle = i < 3 ? '#101018' : '#1c1c26';
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.quadraticCurveTo(cx, cy, ex, ey);
+    ctx.stroke();
+  }
+  // 根元のふんわりボリューム感
+  const hairBase = ctx.createRadialGradient(64, 28, 0, 66, 30, 14);
+  hairBase.addColorStop(0, 'rgba(22,22,34,0.85)');
+  hairBase.addColorStop(1, 'rgba(14,14,24,0)');
+  ctx.fillStyle = hairBase;
+  ctx.beginPath();
+  ctx.ellipse(66, 29, 14, 10, 0.35, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ─── くちばし（左向き、口を開けて歯が見える） ────────────────
+  // 上あご
+  ctx.fillStyle = '#bbbbbb';
+  ctx.beginPath();
+  ctx.moveTo(40, 40);
+  ctx.lineTo(20, 45);   // 先端
+  ctx.lineTo(21, 49);
+  ctx.lineTo(39, 47);
+  ctx.closePath(); ctx.fill();
+  // 上あご上面（ハイライト）
+  ctx.fillStyle = '#d0d0d0';
+  ctx.beginPath();
+  ctx.moveTo(40, 40); ctx.lineTo(20, 45); ctx.lineTo(24, 43); ctx.lineTo(40, 38);
+  ctx.closePath(); ctx.fill();
+  // 下あご
+  ctx.fillStyle = '#a0a0a0';
+  ctx.beginPath();
+  ctx.moveTo(39, 48); ctx.lineTo(22, 50); ctx.lineTo(24, 56); ctx.lineTo(38, 55);
+  ctx.closePath(); ctx.fill();
+  // 口内（暗い赤）
+  ctx.fillStyle = '#661111';
+  ctx.beginPath();
+  ctx.moveTo(40, 40); ctx.lineTo(20, 46); ctx.lineTo(39, 48);
+  ctx.closePath(); ctx.fill();
+  // 上歯（三角形）
+  ctx.fillStyle = '#e8e8c8';
+  for (let i = 0; i < 4; i++) {
+    const tx = 38.5 - i * 4;
+    ctx.beginPath();
+    ctx.moveTo(tx, 47); ctx.lineTo(tx - 1.5, 52); ctx.lineTo(tx - 3, 47);
+    ctx.fill();
+  }
+  // 下歯（短め）
+  ctx.fillStyle = '#ddddbc';
+  for (let i = 0; i < 3; i++) {
+    const tx = 37 - i * 4;
+    ctx.beginPath();
+    ctx.moveTo(tx, 49); ctx.lineTo(tx - 1.2, 53); ctx.lineTo(tx - 2.4, 49);
+    ctx.fill();
+  }
+
+  // ─── 目（左横顔→片目のみ見える、大きな黄色い目） ────────────
+  const EX = 50, EY = 36, ER = 11;
+  // 暗い眼窩（ソケット）
+  ctx.fillStyle = '#162218';
+  ctx.beginPath(); ctx.arc(EX, EY, ER + 2.5, 0, Math.PI * 2); ctx.fill();
+  // 黄色い虹彩
+  const eyeGrad = ctx.createRadialGradient(EX-2, EY-2, 1, EX, EY, ER);
+  eyeGrad.addColorStop(0, '#ffff55');
+  eyeGrad.addColorStop(0.5, '#ccee00');
+  eyeGrad.addColorStop(0.85, '#99aa00');
+  eyeGrad.addColorStop(1, '#666600');
+  ctx.fillStyle = eyeGrad;
+  ctx.beginPath(); ctx.arc(EX, EY, ER, 0, Math.PI * 2); ctx.fill();
+  // 黒い瞳孔
+  ctx.fillStyle = '#060606';
+  ctx.beginPath(); ctx.arc(EX, EY, ER * 0.4, 0, Math.PI * 2); ctx.fill();
+  // 主ハイライト
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.beginPath(); ctx.arc(EX - 3.5, EY - 3.5, 3, 0, Math.PI * 2); ctx.fill();
+  // 副ハイライト
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.beginPath(); ctx.arc(EX + 3, EY - 1.5, 1.5, 0, Math.PI * 2); ctx.fill();
+
   return ctx.canvas.toDataURL();
 }
