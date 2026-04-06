@@ -336,6 +336,43 @@ function buildBirdMesh(): THREE.Group {
 function buildMypaceMesh(): THREE.Group {
   const group = new THREE.Group();
 
+  // ── 黄色い星（背景スプライト、常にカメラを向く） ─────────────────
+  const starCanvas = document.createElement('canvas');
+  starCanvas.width = starCanvas.height = 256;
+  const sc = starCanvas.getContext('2d')!;
+
+  const drawStar5 = (cx: number, cy: number, oR: number, iR: number) => {
+    sc.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const angle = (i * Math.PI / 5) - Math.PI / 2;
+      const r = i % 2 === 0 ? oR : iR;
+      const x = cx + Math.cos(angle) * r; const y = cy + Math.sin(angle) * r;
+      if (i === 0) sc.moveTo(x, y); else sc.lineTo(x, y);
+    }
+    sc.closePath();
+  };
+  // 塗りつぶし星
+  drawStar5(128, 128, 110, 46);
+  const starGrad = sc.createRadialGradient(110, 104, 10, 128, 128, 110);
+  starGrad.addColorStop(0, '#ffee55');
+  starGrad.addColorStop(1, '#ddaa00');
+  sc.fillStyle = starGrad;
+  sc.fill();
+  // アウトライン星（輪郭）
+  sc.lineJoin = 'round';
+  drawStar5(128, 128, 104, 43);
+  sc.strokeStyle = 'rgba(255,255,200,0.75)';
+  sc.lineWidth = 8;
+  sc.stroke();
+
+  const starTex = new THREE.CanvasTexture(starCanvas);
+  const starMat = new THREE.SpriteMaterial({ map: starTex, transparent: true, depthWrite: false });
+  const starSprite = new THREE.Sprite(starMat);
+  starSprite.renderOrder = -1;
+  starSprite.scale.set(1.35, 1.35, 1);
+  starSprite.position.y = 0.18;
+  group.add(starSprite);
+
   const skinMat   = new THREE.MeshStandardMaterial({ color: 0xdda870, roughness: 0.72 });
   const blackMat  = new THREE.MeshStandardMaterial({ color: 0x0e0e14, roughness: 0.65 });
   const whiteMat  = new THREE.MeshStandardMaterial({ color: 0xeeeeee, emissive: 0xbbbbbb, emissiveIntensity: 0.12 });

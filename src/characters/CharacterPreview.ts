@@ -422,6 +422,27 @@ function drawMypace(): string {
   const rr = (x: number, y: number, w: number, h: number, r: number | number[]) =>
     (ctx as unknown as { roundRect: (x:number,y:number,w:number,h:number,r:number|number[])=>void }).roundRect(x, y, w, h, r);
 
+  // ── 黄色い星（最背面） ────────────────────────────────────────
+  const drawStar5 = (cx: number, cy: number, oR: number, iR: number) => {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const angle = (i * Math.PI / 5) - Math.PI / 2;
+      const r = i % 2 === 0 ? oR : iR;
+      if (i === 0) ctx.moveTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+      else ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+    }
+    ctx.closePath();
+  };
+  drawStar5(64, 62, 56, 23);
+  const starG = ctx.createRadialGradient(56, 54, 5, 64, 62, 56);
+  starG.addColorStop(0, '#ffee55');
+  starG.addColorStop(1, '#ddaa00');
+  ctx.fillStyle = starG; ctx.fill();
+  ctx.lineJoin = 'round';
+  drawStar5(64, 62, 51, 21);
+  ctx.strokeStyle = 'rgba(255,255,180,0.8)';
+  ctx.lineWidth = 4.5; ctx.stroke();
+
   // ── 靴（最背面） ──────────────────────────────────────────────
   ctx.fillStyle = '#0e0e14';
   ctx.beginPath(); rr(35, 104, 24, 16, [5, 5, 3, 3]); ctx.fill();
