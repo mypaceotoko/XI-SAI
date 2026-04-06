@@ -27,6 +27,7 @@ function makeCtx(): CanvasRenderingContext2D {
 
 function drawPreview(id: CharacterId): string {
   switch (id) {
+    case 'bird':   return drawBird();
     case 'ball':   return drawBall();
     case 'insect': return drawInsect();
     case 'tank':   return drawTank();
@@ -194,5 +195,126 @@ function drawTank(): string {
   ctx.strokeStyle = 'rgba(160,210,210,0.85)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(67, 81); ctx.lineTo(69, 90); ctx.stroke();
 
+  return ctx.canvas.toDataURL();
+}
+
+// ── バードレイザー ────────────────────────────────────────────────
+
+function drawBird(): string {
+  const ctx = makeCtx(); // 128 × 128
+  const W = S, H = S;
+
+  // 尾羽（最背面、長いカール）
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = '#22bb55';
+  ctx.beginPath();
+  ctx.moveTo(68, 92);
+  ctx.bezierCurveTo(40, 108, 18, 118, 22, 128);
+  ctx.stroke();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#55ee88';
+  ctx.beginPath();
+  ctx.moveTo(72, 94);
+  ctx.bezierCurveTo(48, 112, 26, 120, 30, 128);
+  ctx.stroke();
+  ctx.restore();
+
+  // 翼（青紫）
+  const wingGrad = ctx.createLinearGradient(74, 58, 112, 98);
+  wingGrad.addColorStop(0, '#5566ee');
+  wingGrad.addColorStop(1, '#1122aa');
+  ctx.fillStyle = wingGrad;
+  ctx.beginPath();
+  ctx.moveTo(74, 62);
+  ctx.bezierCurveTo(100, 56, 118, 72, 112, 100);
+  ctx.bezierCurveTo(104, 114, 82, 112, 70, 100);
+  ctx.closePath();
+  ctx.fill();
+
+  // 体（ティール楕円）
+  const bodyGrad = ctx.createRadialGradient(60, 82, 4, 64, 84, 28);
+  bodyGrad.addColorStop(0, '#55ddcc');
+  bodyGrad.addColorStop(1, '#116655');
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.ellipse(63, 85, 24, 30, -0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 胸（赤橙）
+  const chestGrad = ctx.createRadialGradient(56, 80, 1, 57, 82, 16);
+  chestGrad.addColorStop(0, '#ff8844');
+  chestGrad.addColorStop(1, 'rgba(150,40,20,0)');
+  ctx.fillStyle = chestGrad;
+  ctx.beginPath();
+  ctx.ellipse(56, 82, 15, 18, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 足
+  ctx.strokeStyle = '#444455'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  const claws: [number, number, number, number][] = [
+    [57, 108, 48, 120], [57, 108, 54, 122], [57, 108, 62, 120],
+    [70, 108, 65, 120], [70, 108, 72, 122], [70, 108, 78, 118],
+  ];
+  for (const [ax, ay, bx, by] of claws) {
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  }
+
+  // 頭
+  const headGrad = ctx.createRadialGradient(58, 50, 3, 62, 54, 24);
+  headGrad.addColorStop(0, '#66eedd');
+  headGrad.addColorStop(1, '#116666');
+  ctx.fillStyle = headGrad;
+  ctx.beginPath();
+  ctx.ellipse(61, 55, 22, 24, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ヘアクレスト（黒い逆立ち毛）
+  const crestPoints: [number, number, number, number, number, number][] = [
+    [66, 32, 78, 10, 82, 4],
+    [63, 31, 72, 8,  74, 2],
+    [60, 31, 64, 6,  64, 0],
+    [57, 33, 55, 8,  52, 4],
+  ];
+  ctx.lineCap = 'round';
+  for (let i = 0; i < crestPoints.length; i++) {
+    const [x1, y1, cx, cy, x2, y2] = crestPoints[i];
+    ctx.strokeStyle = i % 2 === 0 ? '#1a1a2a' : '#2a2a3e';
+    ctx.lineWidth = 3.5 - i * 0.4;
+    ctx.beginPath(); ctx.moveTo(x1, y1);
+    ctx.quadraticCurveTo(cx, cy, x2, y2);
+    ctx.stroke();
+  }
+
+  // くちばし
+  ctx.fillStyle = '#aaaaaa';
+  ctx.beginPath();
+  ctx.moveTo(38, 58); ctx.lineTo(52, 54); ctx.lineTo(52, 60); ctx.lineTo(40, 62);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#888888';
+  ctx.beginPath();
+  ctx.moveTo(40, 62); ctx.lineTo(52, 60); ctx.lineTo(50, 66); ctx.lineTo(42, 68);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#551111';
+  ctx.beginPath();
+  ctx.moveTo(52, 54); ctx.lineTo(52, 66); ctx.lineTo(42, 70); ctx.lineTo(38, 62);
+  ctx.closePath(); ctx.fill();
+
+  // 黄色い目
+  ctx.fillStyle = '#223322';
+  ctx.beginPath(); ctx.arc(55, 50, 12, 0, Math.PI * 2); ctx.fill();
+  const eyeG = ctx.createRadialGradient(54, 49, 1, 55, 50, 10);
+  eyeG.addColorStop(0, '#ffff44');
+  eyeG.addColorStop(0.7, '#ddaa00');
+  eyeG.addColorStop(1, '#886600');
+  ctx.fillStyle = eyeG;
+  ctx.beginPath(); ctx.arc(55, 50, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#0a0a0a';
+  ctx.beginPath(); ctx.arc(55, 51, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath(); ctx.arc(52, 47, 2, 0, Math.PI * 2); ctx.fill();
+
+  void W; void H;
   return ctx.canvas.toDataURL();
 }

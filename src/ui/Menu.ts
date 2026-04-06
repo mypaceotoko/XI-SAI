@@ -129,26 +129,25 @@ export class Menu {
 
         /* キャラクター選択 */
         .char-grid {
-          display: flex;
-          gap: 10px;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px;
           margin-bottom: 16px;
-          justify-content: center;
-          flex-wrap: wrap;
-          max-width: 400px;
+          width: 100%;
+          max-width: 440px;
         }
         .char-card {
           background: rgba(255,255,255,0.07);
           border: 2px solid rgba(255,255,255,0.15);
           border-radius: 14px;
-          padding: 10px 8px 8px;
+          padding: 8px 6px 7px;
           cursor: pointer;
           text-align: center;
           transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
           touch-action: none;
           -webkit-tap-highlight-color: transparent;
           user-select: none;
-          width: 108px;
-          flex-shrink: 0;
+          position: relative;
         }
         .char-card:hover  { background: rgba(0,255,170,0.08); }
         .char-card:active { transform: scale(0.96); }
@@ -158,15 +157,33 @@ export class Menu {
           box-shadow: 0 0 14px rgba(0,255,170,0.35);
         }
         .char-preview {
-          width: 90px;
-          height: 90px;
+          width: 82px;
+          height: 82px;
           border-radius: 10px;
           display: block;
-          margin: 0 auto 6px;
+          margin: 0 auto 5px;
           background: rgba(255,255,255,0.04);
+          object-fit: contain;
         }
-        .char-name { font-size: 12px; font-weight: 800; color: #fff; margin-bottom: 3px; }
-        .char-desc { font-size: 10px; color: #aaa; line-height: 1.35; }
+        .char-name { font-size: 11px; font-weight: 800; color: #fff; margin-bottom: 2px; }
+        .char-desc { font-size: 9px; color: #aaa; line-height: 1.3; }
+        .char-badge-new {
+          position: absolute;
+          top: -6px; right: -6px;
+          background: linear-gradient(135deg, #ff4444, #ff8800);
+          color: #fff;
+          font-size: 9px;
+          font-weight: 900;
+          padding: 2px 6px;
+          border-radius: 8px;
+          box-shadow: 0 0 8px rgba(255,100,0,0.6);
+          animation: new-pulse 1.5s ease-in-out infinite;
+          pointer-events: none;
+        }
+        @keyframes new-pulse {
+          0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(255,100,0,0.6); }
+          50%       { transform: scale(1.08); box-shadow: 0 0 14px rgba(255,150,0,0.9); }
+        }
 
         /* クリア時タイトル */
         .menu-title-clear {
@@ -205,14 +222,15 @@ export class Menu {
           .menu-btn    { padding: 10px 22px; font-size: 15px; }
           .mode-grid   { max-width: 280px; }
           .menu-title-clear { font-size: 40px; }
-          .char-card   { width: 90px; padding: 8px 6px 6px; }
-          .char-preview { width: 74px; height: 74px; }
-          .char-name   { font-size: 11px; }
+          .char-grid   { max-width: 340px; gap: 6px; }
+          .char-preview { width: 66px; height: 66px; }
+          .char-name   { font-size: 10px; }
+          .char-desc   { font-size: 8px; }
         }
         @media (max-width: 380px) {
-          .char-grid   { gap: 7px; }
-          .char-card   { width: 80px; }
-          .char-preview { width: 66px; height: 66px; }
+          .char-grid   { max-width: 300px; gap: 5px; }
+          .char-preview { width: 58px; height: 58px; }
+          .char-name   { font-size: 9px; }
         }
       </style>
       <div class="menu-content" id="menu-content"></div>
@@ -287,6 +305,7 @@ export class Menu {
 
     const cardHtml = CHARACTER_LIST.map(c => `
       <div class="char-card${c.id === currentId ? ' selected' : ''}" data-charid="${c.id}" id="char-${c.id}">
+        ${c.isNew ? '<div class="char-badge-new">NEW</div>' : ''}
         <img class="char-preview" src="${previews[c.id]}" alt="${c.name}">
         <div class="char-name">${c.name}</div>
         <div class="char-desc">${c.description}</div>
